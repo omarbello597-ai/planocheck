@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0b3d2e">
+<title>PlanoCheck · Category Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#0b3d2e; --green2:#0f5a3f; --green-l:#1c6647; --lime:#b6e62e; --lime-d:#8fbf1f;
+  --ink:#13201a; --paper:#f4f1e9; --card:#ffffff; --muted:#6b7d74;
+  --red:#c0392b; --amber:#e08a12; --ok:#1c8a5a; --line:rgba(11,61,46,.12);
+  --shadow:0 2px 14px rgba(11,61,46,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:'Archivo',system-ui,sans-serif;background:var(--paper);color:var(--ink);
+  font-size:16px;line-height:1.5;overscroll-behavior:none}
+.hidden{display:none!important}
+.app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;position:relative}
+
+/* top bar */
+.topbar{background:var(--green);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px;
+  position:sticky;top:0;z-index:20;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.topbar .logo{font-family:'Archivo Narrow';font-weight:700;font-size:20px;letter-spacing:.5px;text-transform:uppercase}
+.topbar .logo b{color:var(--lime)}
+.topbar .sp{flex:1}
+.topbar button{background:rgba(255,255,255,.12);border:0;color:#fff;padding:7px 10px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer}
+.crumbs{font-size:12px;color:var(--muted);padding:10px 18px 0;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+
+.scroll{flex:1;overflow-y:auto;padding:16px 18px 120px}
+
+/* cards / inputs */
+.card{background:var(--card);border-radius:16px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px;border:1px solid var(--line)}
+h1{font-size:22px;font-weight:800;letter-spacing:-.3px;margin-bottom:4px}
+h2{font-size:17px;font-weight:700;margin-bottom:10px}
+.sub{color:var(--muted);font-size:14px;margin-bottom:16px}
+label{display:block;font-size:13px;font-weight:600;color:var(--green);margin:12px 0 6px;text-transform:uppercase;letter-spacing:.3px}
+input,select,textarea{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:11px;font-size:16px;
+  font-family:inherit;background:#fcfbf7;color:var(--ink);transition:border .15s}
+input:focus,select:focus,textarea:focus{outline:0;border-color:var(--lime-d)}
+textarea{min-height:70px;resize:vertical}
+.btn{display:block;width:100%;padding:15px;border:0;border-radius:13px;font-size:16px;font-weight:700;
+  cursor:pointer;font-family:inherit;transition:transform .1s,opacity .15s}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--green);color:#fff}
+.btn-lime{background:var(--lime);color:var(--green)}
+.btn-ghost{background:transparent;color:var(--green);border:1.5px solid var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn+.btn{margin-top:10px}
+
+/* cuerpos selector */
+.cuerpos{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.cuerpo-opt{border:2px solid var(--line);border-radius:14px;padding:18px 14px;text-align:center;cursor:pointer;background:#fcfbf7;transition:all .15s}
+.cuerpo-opt.sel{border-color:var(--green);background:#eef6f1}
+.cuerpo-opt .big{font-size:34px;font-weight:800;color:var(--green);line-height:1}
+.cuerpo-opt .lbl{font-size:13px;font-weight:600;color:var(--muted);margin-top:6px}
+.cuerpo-opt .dif{font-size:11px;font-weight:700;color:var(--lime-d);margin-top:3px;text-transform:uppercase}
+
+/* photo */
+.photo-box{border:2px dashed var(--line);border-radius:13px;padding:20px;text-align:center;color:var(--muted);cursor:pointer;background:#fcfbf7;font-size:14px;font-weight:600}
+.photo-box img{max-width:100%;border-radius:9px;margin-top:8px}
+
+/* checklist */
+.lvl-head{font-family:'Archivo Narrow';font-weight:700;font-size:15px;color:var(--green);text-transform:uppercase;
+  letter-spacing:.5px;margin:18px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--lime);display:flex;justify-content:space-between}
+.lvl-head span{color:var(--muted);font-size:12px}
+.prod{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.prod:last-child{border-bottom:0}
+.prod .meta{flex:1;min-width:0}
+.prod .nm{font-size:14px;font-weight:600;line-height:1.25}
+.prod .det{font-size:12px;color:var(--muted);margin-top:2px}
+.prod .brand{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;background:#eef6f1;color:var(--green-l);text-transform:uppercase;margin-right:5px}
+.chk{display:flex;gap:6px;flex-shrink:0}
+.chk button{width:42px;height:38px;border:1.5px solid var(--line);background:#fff;border-radius:10px;font-size:18px;cursor:pointer;font-weight:700;color:var(--muted)}
+.chk button.yes.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.chk button.no.on{background:var(--red);border-color:var(--red);color:#fff}
+.motivo{margin-top:8px}
+.motivo select{font-size:14px;padding:9px 11px}
+
+/* score */
+.scorewrap{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:6px 0 14px}
+.score{border-radius:15px;padding:18px;text-align:center;color:#fff}
+.score .v{font-size:40px;font-weight:800;line-height:1}
+.score .l{font-size:12px;font-weight:600;opacity:.92;margin-top:4px;text-transform:uppercase;letter-spacing:.3px}
+.score.adj{background:var(--green)}
+.score.nov{background:var(--green-l)}
+.statepill{display:inline-block;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;margin-bottom:12px}
+.statepill.ok{background:#e3f3ea;color:var(--ok)}
+.statepill.warn{background:#fdf0db;color:var(--amber)}
+
+/* plan de accion */
+.action{display:flex;gap:11px;padding:12px;border-radius:12px;background:#fcfbf7;border:1px solid var(--line);margin-bottom:9px;align-items:flex-start}
+.action .rank{width:26px;height:26px;border-radius:50%;background:var(--lime);color:var(--green);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.action .txt{flex:1;font-size:14px}
+.action .txt b{font-weight:700}
+.action .imp{font-size:12px;color:var(--lime-d);font-weight:700;margin-top:3px}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:13px 20px;border-radius:12px;font-size:14px;font-weight:600;z-index:50;box-shadow:0 6px 24px rgba(0,0,0,.3);max-width:90%}
+
+/* login */
+.login{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:32px 26px;
+  background:linear-gradient(160deg,var(--green) 0%,#06291e 100%);color:#fff}
+.login .brand{font-family:'Archivo Narrow';font-weight:700;font-size:32px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.login .brand b{color:var(--lime)}
+.login .tag{color:rgba(255,255,255,.7);font-size:15px;margin-bottom:32px}
+.login label{color:rgba(255,255,255,.85)}
+.login input{background:rgba(255,255,255,.95);border:0}
+.login .btn{margin-top:22px}
+.login .switch{text-align:center;color:rgba(255,255,255,.8);font-size:14px;margin-top:18px;cursor:pointer}
+.login .switch b{color:var(--lime)}
+.login .note{background:rgba(255,255,255,.1);border-radius:11px;padding:12px;font-size:12.5px;color:rgba(255,255,255,.8);margin-top:20px;line-height:1.5}
+.fixedbar{position:fixed;bottom:0;left:0;right:0;max-width:520px;margin:0 auto;padding:14px 18px;
+  background:linear-gradient(transparent,var(--paper) 22%);z-index:15}
+.copyr{text-align:center;font-size:11.5px;color:rgba(255,255,255,.55);margin-top:26px;letter-spacing:.4px}.copyr b{color:rgba(182,230,46,.85);font-weight:600}
+.copyr-app{text-align:center;font-size:11px;color:var(--muted);padding:18px 0 8px;letter-spacing:.3px}.copyr-app b{color:var(--green-l);font-weight:600}
+.banner{background:#fdf0db;border:1px solid var(--amber);color:#7a4a06;padding:11px 14px;border-radius:11px;font-size:13px;font-weight:600;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- LOGIN -->
+  <div id="screen-login" class="login">
+    <div class="brand">Plano<b>Check</b></div>
+    <div class="tag">Category Management · Validación de planogramas</div>
+    <div id="cfgBanner" class="note" style="background:rgba(192,57,43,.25)"></div>
+    <label>Correo</label>
+    <input id="li-email" type="email" placeholder="tu@correo.com" autocomplete="email">
+    <label>Contraseña</label>
+    <input id="li-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+    <input id="li-name" class="hidden" type="text" placeholder="Tu nombre completo">
+    <select id="li-region" class="hidden"><option value="">Región...</option><option>Bogotá / Cundinamarca / Boyacá</option></select>
+    <button id="li-btn" class="btn btn-lime">Ingresar</button>
+    <div class="switch" id="li-switch">¿No tienes cuenta? <b>Regístrate</b></div>
+    <div class="note">Tras registrarte, un administrador debe aprobar tu cuenta antes de poder registrar visitas.</div>
+    <div class="copyr">© 2026 <b>ESGLOB</b> · Todos los derechos reservados</div>
+  </div>
+
+  <!-- APP -->
+  <div id="screen-app" class="hidden" style="display:flex;flex-direction:column;min-height:100vh">
+    <div class="topbar">
+      <div class="logo">Plano<b>Check</b></div>
+      <div class="sp"></div>
+      <span id="userchip" style="font-size:12px;opacity:.85"></span>
+      <button id="logout">Salir</button>
+    </div>
+    <div class="crumbs" id="crumbs">Inicio</div>
+    <div class="scroll" id="content"></div>
+    <div class="copyr-app">© 2026 <b>ESGLOB</b> · PlanoCheck</div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+</div>
+
+<script>
+window.__FIREBASE_CONFIG__ = {
+  apiKey: "AIzaSyBZ8VWwQf1xmZi9nSy3XVWznnyCx-SogM4",
+  authDomain: "planocheck-esglob.firebaseapp.com",
+  projectId: "planocheck-esglob",
+  storageBucket: "planocheck-esglob.firebasestorage.app",
+  messagingSenderId: "1055900275809",
+  appId: "1:1055900275809:web:4526870d09d87391ef4620",
+  measurementId: "G-MWDLZWM48H"
+};
+</script>
+<script>
+const PLANO = {"difusion_10": {"nombre": "1 cuerpo", "cuerpos": 1, "productos": [{"nivel": "Entrepaño 1", "posicion": 1, "ean": "7702155798001", "marca": "SIMONIZ", "descripcion": "Refrigerante Hibridos y Electr", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 1", "posicion": 2, "ean": "7702155030446", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 2, "pond_ventas": 0.106943, "pond_norm": 0.099229}, {"nivel": "Entrepaño 1", "posicion": 3, "ean": "7702155030460", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 2, "pond_ventas": 0.097721, "pond_norm": 0.090672}, {"nivel": "Entrepaño 1", "posicion": 4, "ean": "7702155030453", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 1, "pond_ventas": 0.048634, "pond_norm": 0.045126}, {"nivel": "Entrepaño 2", "posicion": 1, "ean": "7702155798001", "marca": "SIMONIZ", "descripcion": "Refrigerante Hibridos y Electr", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 2", "posicion": 2, "ean": "7702155030446", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 2, "pond_ventas": 0.106943, "pond_norm": 0.099229}, {"nivel": "Entrepaño 2", "posicion": 3, "ean": "7702155030460", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 2, "pond_ventas": 0.097721, "pond_norm": 0.090672}, {"nivel": "Entrepaño 2", "posicion": 4, "ean": "7702155030453", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 1, "pond_ventas": 0.048634, "pond_norm": 0.045126}, {"nivel": "Entrepaño 3", "posicion": 1, "ean": "7702155798001", "marca": "SIMONIZ", "descripcion": "Refrigerante Hibridos y Electr", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 3", "posicion": 2, "ean": "7702155030477", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 4, "pond_ventas": 0.059751, "pond_norm": 0.055441}, {"nivel": "Entrepaño 3", "posicion": 3, "ean": "7702155030491", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 3, "pond_ventas": 0.04688, "pond_norm": 0.043499}, {"nivel": "Entrepaño 3", "posicion": 4, "ean": "7702155030484", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 2, "pond_ventas": 0.024539, "pond_norm": 0.022769}, {"nivel": "Entrepaño 4", "posicion": 1, "ean": "7702155585670", "marca": "SIMONIZ", "descripcion": "Limpiador Protector Antioxido", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 4", "posicion": 2, "ean": "7702155442157", "marca": "SIMONIZ", "descripcion": "Lubricante Antifriccion Todo T", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 4", "posicion": 3, "ean": "7702155852383", "marca": "SIMONIZ", "descripcion": "Lubricante Antifriccion Cerami", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 4", "posicion": 4, "ean": "7702155040483", "marca": "SIMONIZ", "descripcion": "Lubricante Polyflon Moto Bien", "caras": 2, "pond_ventas": 0.040646, "pond_norm": 0.037714}, {"nivel": "Entrepaño 4", "posicion": 5, "ean": "7702155044597", "marca": "SIMONIZ", "descripcion": "Lubricante Todo Terreno", "caras": 2, "pond_ventas": 0.025399, "pond_norm": 0.023567}, {"nivel": "Entrepaño 4", "posicion": 6, "ean": "7702155044603", "marca": "SIMONIZ", "descripcion": "Lubricante Cadenas Racing", "caras": 2, "pond_ventas": 0.025229, "pond_norm": 0.023409}, {"nivel": "Entrepaño 4", "posicion": 7, "ean": "7702155040476", "marca": "SIMONIZ", "descripcion": "Limpiador Desengrasante Moto B", "caras": 2, "pond_ventas": 0.03531, "pond_norm": 0.032763}, {"nivel": "Entrepaño 4", "posicion": 8, "ean": "7702155217472", "marca": "SIMONIZ", "descripcion": "Lubricante Kit Arrastre y Cade", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 4", "posicion": 9, "ean": "7702155977543", "marca": "SIMONIZ", "descripcion": "Cera Instabrillo Moto Bien 220", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 4", "posicion": 10, "ean": "7702155505661", "marca": "SIMONIZ", "descripcion": "Renovador Llantas Sim Moto Bie", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 4", "posicion": 11, "ean": "7702155040520", "marca": "SIMONIZ", "descripcion": "Limpiador en Seco", "caras": 2, "pond_ventas": 0.017561, "pond_norm": 0.016294}, {"nivel": "Entrepaño 4", "posicion": 12, "ean": "7702155521159", "marca": "SIMONIZ", "descripcion": "Lavado Y Brillo Ecologico Sin", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 5", "posicion": 1, "ean": "7702155009657", "marca": "SIMONIZ", "descripcion": "Mejorador de Octanaje", "caras": 2, "pond_ventas": 0.02694, "pond_norm": 0.024997}, {"nivel": "Entrepaño 5", "posicion": 2, "ean": "7702155009640", "marca": "SIMONIZ", "descripcion": "Limpiador de Inyectores y Carb", "caras": 1, "pond_ventas": 0.024509, "pond_norm": 0.022741}, {"nivel": "Entrepaño 5", "posicion": 3, "ean": "7703305670963", "marca": "SIMONIZ", "descripcion": "Silicona Ultra Rápida en Aeros", "caras": 1, "pond_ventas": 0.01197, "pond_norm": 0.011107}, {"nivel": "Entrepaño 5", "posicion": 4, "ean": "79567520054", "marca": "WD-40", "descripcion": "LUBRICANTE WD-40 AEROSOL 5.5OZ", "caras": 4, "pond_ventas": 0.070091, "pond_norm": 0.065035}, {"nivel": "Entrepaño 5", "posicion": 5, "ean": "79567570363", "marca": "TRES EN UNO", "descripcion": "ACEITE 3 EN UNO GOTERO 90ml", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 5", "posicion": 6, "ean": "79567570301", "marca": "TRES EN UNO", "descripcion": "ACEIE 3 EN 1 GOTERO", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 5", "posicion": 7, "ean": "7709990762853", "marca": "BIOL", "descripcion": "ACEITE LUBRICANTE GOTERO", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 5", "posicion": 8, "ean": "7702158364333", "marca": "CRC", "descripcion": "CERA DESMANCHA MOTOS DOY PACK", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 5", "posicion": 9, "ean": "7702158809285", "marca": "CRC", "descripcion": "Limpiador Visor Cascos", "caras": 1, "pond_ventas": 0.007646, "pond_norm": 0.007094}, {"nivel": "Entrepaño 6", "posicion": 1, "ean": "7702155031467", "marca": "SIMONIZ", "descripcion": "ADITIVO GASOLINA", "caras": 2, "pond_ventas": 0.032759, "pond_norm": 0.030396}, {"nivel": "Entrepaño 6", "posicion": 2, "ean": "7702155031450", "marca": "SIMONIZ", "descripcion": "Aditivo Bio Oxigenerador", "caras": 1, "pond_ventas": 0.00048, "pond_norm": 0.000445}, {"nivel": "Entrepaño 6", "posicion": 3, "ean": "7702155185146", "marca": "SIMONIZ", "descripcion": "Aditivo Qual Fuel Sy Clean", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 6", "posicion": 4, "ean": "7702155027118", "marca": "SIMONIZ", "descripcion": "LIMPIADOR ELECTRONICO", "caras": 1, "pond_ventas": 1e-06, "pond_norm": 1e-06}, {"nivel": "Entrepaño 6", "posicion": 5, "ean": "79567520115", "marca": "WD-40", "descripcion": "LUBRICANTE WD-40 AEROSOL 11oz", "caras": 3, "pond_ventas": 0.064727, "pond_norm": 0.060058}, {"nivel": "Entrepaño 6", "posicion": 6, "ean": "79567520160", "marca": "TRES EN UNO", "descripcion": "LIMPIADOR 3 EN UNO CONTACTO TE", "caras": 2, "pond_ventas": 0.02337, "pond_norm": 0.021684}, {"nivel": "Entrepaño 6", "posicion": 7, "ean": "79567570325", "marca": "TRES EN UNO", "descripcion": "ACEITE 3 EN 1 AEROSOL", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 6", "posicion": 8, "ean": "7702158350121", "marca": "CRC", "descripcion": "Lubricante Penetrante 5-56", "caras": 1, "pond_ventas": 0.025242, "pond_norm": 0.023421}, {"nivel": "Entrepaño 6", "posicion": 9, "ean": "7702158328694", "marca": "CRC", "descripcion": "Lubricante Cadenas Y Piñones 4", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0.0}, {"nivel": "Entrepaño 6", "posicion": 10, "ean": "7702158356048", "marca": "CRC", "descripcion": "DESENGRASANTE CADENAS P/MOTOS", "caras": 1, "pond_ventas": 0.008092, "pond_norm": 0.007508}]}, "difusion_20": {"nombre": "2 cuerpos", "cuerpos": 2, "productos": [{"nivel": "Entrepaño 1", "posicion": 1, "ean": "7702155798001", "marca": "SIMONIZ", "descripcion": "Refrigerante Hibridos y Electr", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 1", "posicion": 2, "ean": "7702155030446", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 5, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 2", "posicion": 1, "ean": "7702155798001", "marca": "SIMONIZ", "descripcion": "Refrigerante Hibridos y Electr", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 2", "posicion": 2, "ean": "7702155030446", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 5, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 3", "posicion": 1, "ean": "7702155798001", "marca": "SIMONIZ", "descripcion": "Refrigerante Hibridos y Electr", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 3", "posicion": 2, "ean": "7702155030477", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 10, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4", "posicion": 1, "ean": "7702155585670", "marca": "SIMONIZ", "descripcion": "Limpiador Protector Antioxido", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4", "posicion": 2, "ean": "7702155075683", "marca": "SIMONIZ", "descripcion": "Lubricantes Antifriccion Terre", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4", "posicion": 3, "ean": "7702155442157", "marca": "SIMONIZ", "descripcion": "Lubricante Antifriccion Todo T", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4", "posicion": 4, "ean": "7702155852383", "marca": "SIMONIZ", "descripcion": "Lubricante Antifriccion Cerami", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4", "posicion": 5, "ean": "7702155192199", "marca": "SIMONIZ", "descripcion": "Lubricante Cadenas Antifriccio", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4", "posicion": 6, "ean": "7702155040483", "marca": "SIMONIZ", "descripcion": "Lubricante Polyflon Moto Bien", "caras": 3, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4", "posicion": 7, "ean": "7702155044597", "marca": "SIMONIZ", "descripcion": "Lubricante Todo Terreno", "caras": 3, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4", "posicion": 8, "ean": "7702155044603", "marca": "SIMONIZ", "descripcion": "Lubricante Cadenas Racing", "caras": 3, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4", "posicion": 9, "ean": "7702155040476", "marca": "SIMONIZ", "descripcion": "Limpiador Desengrasante Moto B", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4", "posicion": 10, "ean": "7702155217472", "marca": "SIMONIZ", "descripcion": "Lubricante Kit Arrastre y Cade", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4", "posicion": 11, "ean": "7702155410903", "marca": "SIMONIZ", "descripcion": "Limpiador Ultra", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5", "posicion": 1, "ean": "7702155009657", "marca": "SIMONIZ", "descripcion": "Mejorador de Octanaje", "caras": 3, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5", "posicion": 2, "ean": "7702155009640", "marca": "SIMONIZ", "descripcion": "Limpiador de Inyectores y Carb", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5", "posicion": 3, "ean": "7702155551705", "marca": "SIMONIZ", "descripcion": "Limp. Inyectores Gdi - Hibrido", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5", "posicion": 4, "ean": "7703305670963", "marca": "SIMONIZ", "descripcion": "Silicona Ultra Rápida en Aeros", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5", "posicion": 5, "ean": "7703305108022", "marca": "SIMONIZ", "descripcion": "Multi Lubricante zx4", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5", "posicion": 6, "ean": "79567520054", "marca": "WD-40", "descripcion": "LUBRICANTE WD-40 AEROSOL 5.5OZ", "caras": 6, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6", "posicion": 1, "ean": "7702155031467", "marca": "SIMONIZ", "descripcion": "ADITIVO GASOLINA", "caras": 4, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6", "posicion": 2, "ean": "7702155031450", "marca": "SIMONIZ", "descripcion": "Aditivo Bio Oxigenerador", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6", "posicion": 3, "ean": "7702155185146", "marca": "SIMONIZ", "descripcion": "Aditivo Qual Fuel Sy Clean", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6", "posicion": 4, "ean": "7702155027118", "marca": "SIMONIZ", "descripcion": "LIMPIADOR ELECTRONICO", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6", "posicion": 5, "ean": "7702155895526", "marca": "SIMONIZ", "descripcion": "Silicona Ultra Rapida 354ml Ch", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6", "posicion": 6, "ean": "7702155800667", "marca": "SIMONIZ", "descripcion": "Silicona Ultra Rapida 354ml Fr", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6", "posicion": 7, "ean": "7702155520015", "marca": "SIMONIZ", "descripcion": "Multi Lubricante zx4", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6", "posicion": 8, "ean": "79567520115", "marca": "WD-40", "descripcion": "LUBRICANTE WD-40 AEROSOL 11oz", "caras": 5, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 1-1", "posicion": 1, "ean": "7702155030460", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 3, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 1-1", "posicion": 2, "ean": "7702155030453", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 2-1", "posicion": 1, "ean": "7702155030460", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 3, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 2-1", "posicion": 2, "ean": "7702155030453", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 3-1", "posicion": 1, "ean": "7702155030491", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 5, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 3-1", "posicion": 2, "ean": "7702155030484", "marca": "SIMONIZ", "descripcion": "Refrigerante Radiador", "caras": 4, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4-1", "posicion": 1, "ean": "7702155957989", "marca": "SIMONIZ", "descripcion": "Limpiador Desengrasante Frenos", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4-1", "posicion": 2, "ean": "7702155977543", "marca": "SIMONIZ", "descripcion": "Cera Instabrillo Moto Bien 220", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4-1", "posicion": 3, "ean": "7702155505661", "marca": "SIMONIZ", "descripcion": "Renovador Llantas Sim Moto Bie", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4-1", "posicion": 4, "ean": "7702155040520", "marca": "SIMONIZ", "descripcion": "Limpiador en Seco", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4-1", "posicion": 5, "ean": "7702155521159", "marca": "SIMONIZ", "descripcion": "Lavado Y Brillo Ecologico Sin", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4-1", "posicion": 6, "ean": "7702155733811", "marca": "SIMONIZ", "descripcion": "Limpiador Protector Antioxido", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4-1", "posicion": 7, "ean": "7702158356000", "marca": "CRC", "descripcion": "LUBRICANTE DE CADENAS P/MOTOS", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4-1", "posicion": 8, "ean": "7702158356178", "marca": "CRC", "descripcion": "LUBRICANTE CADENAS SECO MOTOS", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4-1", "posicion": 9, "ean": "7702158356048", "marca": "CRC", "descripcion": "DESENGRASANTE CADENAS P/MOTOS", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4-1", "posicion": 10, "ean": "7702158809285", "marca": "CRC", "descripcion": "Limpiador Visor Cascos", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4-1", "posicion": 11, "ean": "7702158511584", "marca": "CRC", "descripcion": "Limpiador Kit De Arrastre Moto", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 4-1", "posicion": 12, "ean": "7702158328694", "marca": "CRC", "descripcion": "Lubricante Cadenas Y Piñones 4", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5-1", "posicion": 1, "ean": "7702158350107", "marca": "CRC", "descripcion": "Lubricante Penetrante 5-56", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5-1", "posicion": 2, "ean": "79567520160", "marca": "TRES EN UNO", "descripcion": "LIMPIADOR 3 EN UNO CONTACTO TE", "caras": 3, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5-1", "posicion": 3, "ean": "79567570301", "marca": "TRES EN UNO", "descripcion": "ACEIE 3 EN 1 GOTERO", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5-1", "posicion": 4, "ean": "7709990762853", "marca": "BIOL", "descripcion": "ACEITE LUBRICANTE GOTERO", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5-1", "posicion": 5, "ean": "7702158809254", "marca": "CRC", "descripcion": "Limpiador Brillador Cascos", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5-1", "posicion": 6, "ean": "7702158809292", "marca": "CRC", "descripcion": "Limpiador Espuma Cascos", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5-1", "posicion": 7, "ean": "7702158364333", "marca": "CRC", "descripcion": "CERA DESMANCHA MOTOS DOY PACK", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5-1", "posicion": 8, "ean": "7702158809278", "marca": "CRC", "descripcion": "Brillantas Motos Gel", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 5-1", "posicion": 9, "ean": "7702158957108", "marca": "CRC", "descripcion": "Motor Cleaner Eco Motos", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6-1", "posicion": 1, "ean": "7702158350121", "marca": "CRC", "descripcion": "Lubricante Penetrante 5-56", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6-1", "posicion": 2, "ean": "79567520399", "marca": "TRES EN UNO", "descripcion": "Super Desengrasante Espuma Pe", "caras": 3, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6-1", "posicion": 3, "ean": "79567570325", "marca": "TRES EN UNO", "descripcion": "ACEITE 3 EN 1 AEROSOL", "caras": 4, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6-1", "posicion": 4, "ean": "79567570363", "marca": "TRES EN UNO", "descripcion": "ACEITE 3 EN UNO GOTERO 90ml", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6-1", "posicion": 5, "ean": "7861035418443", "marca": "SMART SHINE", "descripcion": "Desengrasante Biodegradable 47", "caras": 1, "pond_ventas": 0.0, "pond_norm": 0}, {"nivel": "Entrepaño 6-1", "posicion": 6, "ean": "716281510076", "marca": "SLIME", "descripcion": "Antipinchazos Para Llantas16Oz", "caras": 2, "pond_ventas": 0.0, "pond_norm": 0}]}};
+const PDVS = [{"pdv": "079 - Exito Viva Tunja-7701001007908", "depto": "Boyacá", "ciudad": "Tunja"}, {"pdv": "082 - Exito San Martin-7701001008202", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "083 - Exito Villa Mayor-7701001008301", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "084 - Exito Americas-7701001008417", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "086 - Exito Calle 80-7701001008615", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "088 - Exito Colina-7701001008806", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "089 - Exito Fontibon-7701001008905", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "091 - Exito Occidente-7701001009100", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "092 - Exito Norte-7701001009216", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "093 - Exito Suba-7701001009308", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "094 - Exito Chapinero-7701001009407", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "096 - Exito Fusagasuga-7701001009605", "depto": "Cundinamarca", "ciudad": "Fusagasuga"}, {"pdv": "097 - Exito Usme-7701001009704", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "105 - Surtimax Dindalito-7701001010502", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "158 - Exito Zipaquira-7701001015804", "depto": "Cundinamarca", "ciudad": "Zipaquira"}, {"pdv": "166 - Surtimax Estación-7701001016603", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "173 Exito Mosquera-7701001017303", "depto": "Cundinamarca", "ciudad": "Mosquera"}, {"pdv": "217 - Bodega Surtimax San Luis Suba-7701001217000", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "226 - Bodega Surtimax Tabora-7701001022604", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "227 - Bodega Surtimax San Marcos-7701001022703", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "232 - Estación De Servicio Exito Calle 80-7701001023205", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "233 - Estación De Servicio Exito Fontibon-7701001123301", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "235 - Estación De Servicio Exito Suba-7701001123509", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "236 - Estación De Servicio Exito Colina-7701001023601", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "238 - Estación De Servicio Exito Norte-7701001023809", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "239 - Eds Ext Villamayor-7701001023908", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "240 - Eds Exito Americas-7701001240008", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "281 - Exito Floresta-7701001281001", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "282 - Exito Tintal-7701001282008", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "283 - Exito Nuevo Kennedy-7701001283005", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "284 - Exito Veinte De Julio-7701001284002", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "287 - Exito Quirinal-7701001287003", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "289 - Exito Modelia-7701001289007", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "290 - Exito Centenario-7701001290003", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "291 - Exito Restrepo-7701001291000", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "299 - Carulla Granada Hills-7701001299006", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "302 - Exito Ciudad Tunal-7701001030203", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "303 - Exito Unicentro Bogota-7701001030302", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "307 - Exito Plaza Salitre-7701001030708", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "311 - Surtimax Brasil Bosa-7701001031101", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "348 - Carulla Calle 184-7701001034805", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "350 - Carulla Belmira-7701001035000", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "351 - Carulla Polo Club-7701001035109", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "356 - Exito Gran Estacion (Cv)Bogota-7701001356006", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "376 - Exito Bosa-7701001037608", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "388 - Bodega Surtimax Calle 80-7701001388007", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "398 - Bodega Surtimax Suba-7701001398006", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "4025 - Exito Soacha-7701001402505", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "4029 - Exito La Felicidad-7701001040295", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "4047 - Exito Chiquinquira-7701001404707", "depto": "Boyacá", "ciudad": "Chiquinquira"}, {"pdv": "4050 - Éxito El Ensueño-7701001040509", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "4052 Exito Nuestro Bogota-7701001405209", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "406 - Carulla El Retiro-7701001406008", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "4068-Exito Primavera Calle 80-7701001040684", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "412 - Bodega Surtimax Parque Fontibon-7701001412009", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "4179 - Exito Express Calle 119 Con 13-7701001417905", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "434 - Bodega Surtimax Casa Blanca-7701001434001", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "436 - Bodega Surtimax Pradilla-7701001436005", "depto": "Cundinamarca", "ciudad": "Chia"}, {"pdv": "444 - Exito Girardot-7701001444000", "depto": "Cundinamarca", "ciudad": "Girardot"}, {"pdv": "450 - Surtimax San Antonio-7701001450001", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "451 - Bodega Surtimax La Mesa-7701001045108", "depto": "Cundinamarca", "ciudad": "La Mesa"}, {"pdv": "4578-Turbo Carulla Quinta Camacho-7701001045788", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "474 - Bodega Surtimax Trinitaria-7701001047409", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "4780-Carulla La Mesa-7701001247809", "depto": "Cundinamarca", "ciudad": "La Mesa"}, {"pdv": "4806 - Carulla Isla Natura-7701001480602", "depto": "Cundinamarca", "ciudad": "Cajica"}, {"pdv": "4808 - Carulla Terranova-7701001480800", "depto": "Cundinamarca", "ciudad": "Chia"}, {"pdv": "481 - Surtimax La Gloria-7701001048109", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "4817 - Carulla Plaza Claro-7701001481708", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "483 - Exito Fontanar Chía-7701001048307", "depto": "Cundinamarca", "ciudad": "Chia"}, {"pdv": "506 - Bodega Surtimax Patio Bonito-7701001050607", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "511 - Bodega Surtimax San Fernando-7701001511009", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "513 - Bodega Surtimax Versalles-7701001051307", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "517 - Carulla Villa Del Prado-7701001051703", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "518 - Carulla Centro Chia-7701001051802", "depto": "Cundinamarca", "ciudad": "Chia"}, {"pdv": "525 - Carulla Rosales-7701001052502", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "527 - Carulla Soledad-7701001052700", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "537 - Carulla Calle 63-7701001153704", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "546 - Carulla Alhambra-7701001054605", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "548 - Carulla Calle 140-7701001054803", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "549 - Carulla Calle 147-7701001054902", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "550 - Carulla Cedro Bolivar-7701001055008", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "554 - Exito Las Nieves-7701001055404", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "556 - Exito Niza-7701001055602", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "558 - Exito Plaza De Bolivar-7701001055800", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "561 - Carulla Colina-7701001156101", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "562 - Carulla Country-7701001056203", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "563 - Carulla Galerias-7701001156309", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "565 - Carulla Pablo Vi-7701001056500", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "568 - Carulla Quinta Camacho-7701001056807", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "569 - Carulla Rincon De La Colina-7701001056906", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "571 - Bodega Surtimax Gachancipa-7701001571003", "depto": "Cundinamarca", "ciudad": "Gachancipa"}, {"pdv": "573 - Bodega Surtimax Tocancipa-7701001573007", "depto": "Cundinamarca", "ciudad": "Tocancipa"}, {"pdv": "574 - Exito Duitama-7701001057408", "depto": "Boyacá", "ciudad": "Boyacá"}, {"pdv": "575 - Bodega Surtimax San Mateo-7701001057507", "depto": "Cundinamarca", "ciudad": "Soacha"}, {"pdv": "576 - Bodega Surtimax Cajica-7701001057606", "depto": "Cundinamarca", "ciudad": "Cajica"}, {"pdv": "577 - Bodega Surtimax Sopo-7701001057705", "depto": "Cundinamarca", "ciudad": "Sopo"}, {"pdv": "578 - Exito Sogamoso-7701001057804", "depto": "Boyacá", "ciudad": "Sogamoso"}, {"pdv": "579 - Bgta Surtimax Compartir Soacha-7701001579009", "depto": "Cundinamarca", "ciudad": "Soacha"}, {"pdv": "580 - Exito Tunja-7701001058009", "depto": "Boyacá", "ciudad": "Tunja"}, {"pdv": "581 - Carulla Santa Barbara-7701001058108", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "582 - Carulla Calle 47-7701001058207", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "584 - Exito Ciudad Jardin-7701001058405", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "586 - Exito Esperanza-7701001058603", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "646 - Bodega Surtimax Santa Cecilia-7701001064604", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "703 - Bodega Surtimax La Calera-7701001703008", "depto": "Cundinamarca", "ciudad": "La Calera"}, {"pdv": "709 - Bodega Surtimax Yanguas-7701001709000", "depto": "Cundinamarca", "ciudad": "Soacha"}, {"pdv": "713 - Carulla Calle 102-7701001071305", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "768 - Surtimax El Socorro-7701001768007", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "781 - Bodega Surtimax El Recreo Bosa-7701001781006", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "794 - Surtimax Usme Calle 136-7701001794006", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "832 - Estación De Servicio Éxito Funza-7701001832005", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "838 - Estacion De Servicio El Retiro-7701001838007", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "886 - Carulla La Calera-7701001886008", "depto": "Cundinamarca", "ciudad": "La Calera"}, {"pdv": "90 - Exito Facatativa-7701001009001", "depto": "Cundinamarca", "ciudad": "Facatativa"}, {"pdv": "Exito Diverplaza-355-7701001355009", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Exito Mall Plaza Nqs-4043-7701001404301", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Exito Parque Fontibon-4069-7701001040691", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Exito Pradilla-4071-7701001040714", "depto": "Cundinamarca", "ciudad": "Chia"}, {"pdv": "Exito Unicentro Girardot - 4039-7701001040394", "depto": "Cundinamarca", "ciudad": "Girardot"}, {"pdv": "Surtimax Chapinero - 4523-7701001045238", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Surtimax Laureles-4538-7701001045382", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Surtimax Lijaca-4524-7701001045245", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Surtimax Normandia-888-7701001008882", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Surtimax Quiroga-4527-7701001045276", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Surtimax Santa Isabel-4539-7701001045399", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Surtimax Suba Bilbao - 4533-7701001045337", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Car Parq Central Bavaria - 4460-7701001446004", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Barrancas-7701001485706", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Cedritos - 4846-7701001484600", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Chia - 4455-7701001944555", "depto": "Cundinamarca", "ciudad": "Chia"}, {"pdv": "Turbo Carulla Colina -4849-7701001048499", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Country  4847-7701001484709", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla El Lago - 4841-7701001484105", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Engativa Occidental - 4445-7701001444505", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Esperanza - 4459-7701001445908", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Granada Norte - 4447-7701001444727", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Iserra 100 - 4851-7701001048512", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla La Caba�A-7701001045818", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Modelia - 4461-7701001446103", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Niza - 4848-7701001048482", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Palermo - 4852-7701001048529", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Parque 93 - 4843-7701001484303", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Rosales - 4842-7701001484204", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla San Patricio - 4844-7701001484402", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Titan - 4494-7701001044941", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Turbo Carulla Usaquen  Calle 120 -4859-7701001485904", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}, {"pdv": "Éxito Wow - Exito Country 081-7701001008103", "depto": "Santafe De Bogotá", "ciudad": "Santafe De Bogotá"}];
+const MOTIVOS = ["Agotado en bodega","Producto nuevo, aún no exhibido","No hay espacio / reducción de lineal","Descontinuado en esta tienda","Otro"];
+const MOTIVOS_JUST = ["Agotado en bodega","Producto nuevo, aún no exhibido","No hay espacio / reducción de lineal","Descontinuado en esta tienda"]; // these don't penalize ajustada
+
+let FB=null, db=null, auth=null, storage=null, USER=null, PROFILE=null;
+let visit={pdv:null,cuerpos:null,dif:null,checks:{},motivos:{},foto_espacio:null,obs:'',foto_antes:null};
+
+/* ---------- Firebase init (uses your config) ---------- */
+const firebaseConfig = window.__FIREBASE_CONFIG__ || null;
+
+async function initFirebase(){
+  if(!firebaseConfig){ 
+    document.getElementById('cfgBanner').textContent='⚠ Falta configurar Firebase. La app corre en modo DEMO (los datos no se guardan en la nube).';
+    return false;
+  }
+  const a=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+  const au=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+  const fs=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  const st=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js');
+  FB=a.initializeApp(firebaseConfig); auth=au.getAuth(FB); db=fs.getFirestore(FB); storage=st.getStorage(FB);
+  window._au=au; window._fs=fs; window._st=st;
+  document.getElementById('cfgBanner').classList.add('hidden');
+  au.onAuthStateChanged(auth, async u=>{
+    if(u){ USER=u; await loadProfile(); showApp(); } else { USER=null; showLogin(); }
+  });
+  return true;
+}
+async function loadProfile(){
+  const {doc,getDoc}=window._fs;
+  try{ const s=await getDoc(doc(db,'usuarios',USER.uid)); PROFILE=s.exists()?s.data():{rol:'mercaderista',estado:'pendiente',nombre:USER.email}; }
+  catch(e){ PROFILE={rol:'mercaderista',estado:'pendiente',nombre:USER.email}; }
+}
+
+/* ---------- UI helpers ---------- */
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),2600);}
+function showLogin(){document.getElementById('screen-login').classList.remove('hidden');document.getElementById('screen-app').classList.add('hidden');}
+function showApp(){
+  document.getElementById('screen-login').classList.add('hidden');
+  document.getElementById('screen-app').classList.remove('hidden');
+  document.getElementById('userchip').textContent=(PROFILE&&PROFILE.nombre)||'';
+  renderHome();
+}
+
+/* ---------- LOGIN logic ---------- */
+let signupMode=false;
+document.getElementById('li-switch').onclick=()=>{
+  signupMode=!signupMode;
+  document.getElementById('li-name').classList.toggle('hidden',!signupMode);
+  document.getElementById('li-region').classList.toggle('hidden',!signupMode);
+  document.getElementById('li-btn').textContent=signupMode?'Crear cuenta':'Ingresar';
+  document.getElementById('li-switch').innerHTML=signupMode?'¿Ya tienes cuenta? <b>Ingresa</b>':'¿No tienes cuenta? <b>Regístrate</b>';
+};
+document.getElementById('li-btn').onclick=async()=>{
+  const email=document.getElementById('li-email').value.trim();
+  const pass=document.getElementById('li-pass').value;
+  if(!email||!pass){toast('Completa correo y contraseña');return;}
+  if(!auth){ // DEMO mode
+    PROFILE={rol:'mercaderista',estado:'aprobado',nombre:email.split('@')[0]}; USER={uid:'demo',email}; showApp(); return;
+  }
+  const {createUserWithEmailAndPassword,signInWithEmailAndPassword}=window._au;
+  const {doc,setDoc}=window._fs;
+  try{
+    if(signupMode){
+      const name=document.getElementById('li-name').value.trim();
+      const cred=await createUserWithEmailAndPassword(auth,email,pass);
+      await setDoc(doc(db,'usuarios',cred.user.uid),{nombre:name,email,rol:'mercaderista',estado:'pendiente',region:document.getElementById('li-region').value,creado:Date.now()});
+      toast('Cuenta creada. Espera aprobación del administrador.');
+    }else{
+      await signInWithEmailAndPassword(auth,email,pass);
+    }
+  }catch(e){ toast('Error: '+(e.code||e.message)); }
+};
+document.getElementById('logout').onclick=async()=>{ if(auth){const{signOut}=window._au;await signOut(auth);} else showLogin(); };
+
+/* ---------- HOME ---------- */
+function renderHome(){
+  document.getElementById('crumbs').textContent='Inicio';
+  if(PROFILE&&PROFILE.estado==='pendiente'){
+    document.getElementById('content').innerHTML=`<div class="card"><div class="banner">Tu cuenta está <b>pendiente de aprobación</b>. Un administrador debe activarla antes de que puedas registrar visitas.</div></div>`;
+    return;
+  }
+  document.getElementById('content').innerHTML=`
+    <div class="card">
+      <h1>Hola 👋</h1>
+      <div class="sub">Registra la implementación de una tienda.</div>
+      <button class="btn btn-primary" onclick="startVisit()">+ Nueva visita a tienda</button>
+    </div>`;
+}
+
+/* ---------- STEP 1: PDV + cuerpos ---------- */
+window.startVisit=function(){
+  visit={pdv:null,cuerpos:null,dif:null,checks:{},motivos:{},foto_espacio:null,obs:'',foto_antes:null};
+  document.getElementById('crumbs').textContent='Nueva visita › Tienda';
+  const opts=PDVS.map(p=>`<option value="${p.pdv}">${p.pdv}</option>`).join('');
+  document.getElementById('content').innerHTML=`
+    <div class="card">
+      <h2>1 · Identifica la tienda</h2>
+      <label>Punto de venta</label>
+      <select id="v-pdv"><option value="">Selecciona...</option>${opts}</select>
+      <label>¿Cuántos cuerpos / módulos tiene el lineal de la categoría?</label>
+      <div class="cuerpos">
+        <div class="cuerpo-opt" id="c1" onclick="pickCuerpo(1)"><div class="big">1</div><div class="lbl">Un cuerpo</div><div class="dif">Difusión 10</div></div>
+        <div class="cuerpo-opt" id="c2" onclick="pickCuerpo(2)"><div class="big">2</div><div class="lbl">Dos cuerpos</div><div class="dif">Difusión 20</div></div>
+      </div>
+      <label>Foto del espacio / lineal completo</label>
+      <div class="photo-box" onclick="document.getElementById('v-foto').click()" id="fotoBox">📷 Tomar / subir foto del espacio</div>
+      <input id="v-foto" type="file" accept="image/*" capture="environment" class="hidden" onchange="prevFoto(this,'fotoBox','foto_espacio')">
+      <label>Observaciones (opcional)</label>
+      <textarea id="v-obs" placeholder="Ej: el lineal tuvo reducción de espacio, etc."></textarea>
+    </div>
+    <div class="fixedbar"><button class="btn btn-primary" id="next1" disabled onclick="goChecklist()">Continuar al checklist →</button></div>`;
+  document.getElementById('v-pdv').onchange=validate1;
+};
+window.pickCuerpo=function(n){
+  visit.cuerpos=n; visit.dif=n===1?'difusion_10':'difusion_20';
+  document.getElementById('c1').classList.toggle('sel',n===1);
+  document.getElementById('c2').classList.toggle('sel',n===2);
+  validate1();
+};
+function validate1(){
+  visit.pdv=document.getElementById('v-pdv').value;
+  document.getElementById('next1').disabled=!(visit.pdv&&visit.cuerpos);
+}
+window.prevFoto=function(inp,boxid,key){
+  const f=inp.files[0]; if(!f)return;
+  const r=new FileReader(); r.onload=e=>{ visit[key]=e.target.result; document.getElementById(boxid).innerHTML='✓ Foto cargada<br><img src="'+e.target.result+'">'; }; r.readAsDataURL(f);
+};
+
+/* ---------- STEP 2: checklist ---------- */
+window.goChecklist=function(){
+  visit.obs=document.getElementById('v-obs').value;
+  document.getElementById('crumbs').textContent='Nueva visita › Checklist';
+  const prods=PLANO[visit.dif].productos;
+  const niveles=[...new Set(prods.map(p=>p.nivel))];
+  let html=`<div class="card"><h2>2 · ¿Qué está implementado?</h2><div class="sub">${visit.pdv} · ${PLANO[visit.dif].nombre}. Marca presente (✓) o ausente (✗) cada producto.</div>`;
+  niveles.forEach(nv=>{
+    const items=prods.filter(p=>p.nivel===nv);
+    html+=`<div class="lvl-head">${nv} <span>${items.length} prod.</span></div>`;
+    items.forEach((p,idx)=>{
+      const id=p.ean+'_'+nv+'_'+p.posicion;
+      html+=`<div class="prod">
+        <div class="meta"><div class="nm">${p.descripcion}</div>
+          <div class="det"><span class="brand">${p.marca}</span>${p.caras} cara(s) · EAN ${p.ean}</div>
+          <div class="motivo hidden" id="mot_${id}">
+            <select onchange="setMotivo('${id}',this.value)"><option value="">Motivo de ausencia...</option>${MOTIVOS.map(m=>`<option>${m}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="chk">
+          <button class="yes" id="y_${id}" onclick="setChk('${id}',true)">✓</button>
+          <button class="no" id="n_${id}" onclick="setChk('${id}',false)">✗</button>
+        </div></div>`;
+    });
+  });
+  html+=`</div><div class="fixedbar"><button class="btn btn-primary" onclick="calcScore()">Calcular calificación →</button></div>`;
+  document.getElementById('content').innerHTML=html;
+};
+window.setChk=function(id,val){
+  visit.checks[id]=val;
+  document.getElementById('y_'+id).classList.toggle('on',val);
+  document.getElementById('n_'+id).classList.toggle('on',!val);
+  document.getElementById('mot_'+id).classList.toggle('hidden',val);
+  if(val) delete visit.motivos[id];
+};
+window.setMotivo=function(id,v){ visit.motivos[id]=v; };
+
+/* ---------- STEP 3: score + plan ---------- */
+window.calcScore=function(){
+  const prods=PLANO[visit.dif].productos;
+  let presR=0, totR=0;            // novedades (bruta): cuenta presencia simple
+  let presW=0, totW=0, justW=0;   // ajustada: ponderada por ventas, descuenta justificados
+  const faltantes=[];
+  prods.forEach(p=>{
+    const id=p.ean+'_'+p.nivel+'_'+p.posicion;
+    const w=p.pond_norm||0;
+    const present=visit.checks[id]===true;
+    const marked=visit.checks[id]!==undefined;
+    totR++; totW+=w;
+    if(present){ presR++; presW+=w; }
+    else {
+      const mot=visit.motivos[id]||'';
+      const justified=MOTIVOS_JUST.includes(mot);
+      if(justified) justW+=w; // remove from denominator for ajustada
+      faltantes.push({...p,mot,justified,w});
+    }
+  });
+  const novedades = totR? (presR/totR*100):0;                       // Calificación Novedades (bruta)
+  const denomAdj = (totW-justW)||1;
+  const ajustada = ((presW)/denomAdj*100);                          // Calificación Ajustada (ponderada, sin justificados)
+  const apto = ajustada>=90;
+  // plan de accion: faltantes NO justificados, ordenados por peso de ventas
+  const plan = faltantes.filter(f=>!f.justified).sort((a,b)=>b.w-a.w);
+
+  document.getElementById('crumbs').textContent='Nueva visita › Resultado';
+  let html=`<div class="card">
+    <span class="statepill ${apto?'ok':'warn'}">${apto?'✓ Apto para ejecutada (≥90%)':'⚠ Por hacer mejoras (<90%)'}</span>
+    <div class="scorewrap">
+      <div class="score adj"><div class="v">${ajustada.toFixed(0)}%</div><div class="l">Calif. Ajustada</div></div>
+      <div class="score nov"><div class="v">${novedades.toFixed(0)}%</div><div class="l">Calif. Novedades</div></div>
+    </div>
+    <div class="sub">Ajustada: ponderada por ventas \$ y descontando faltantes justificados (agotados, sin espacio). Novedades: presencia simple de todos los productos.</div>
+  </div>`;
+
+  if(plan.length){
+    html+=`<div class="card"><h2>Plan de acción · ${visit.pdv}</h2><div class="sub">Ordenado por impacto en ventas. Surte primero lo de arriba.</div>`;
+    plan.forEach((f,i)=>{
+      const imp=f.w>0?`+${(f.w*100).toFixed(1)}% del lineal en ventas`:'sin venta registrada';
+      html+=`<div class="action"><div class="rank">${i+1}</div><div class="txt">
+        <b>Agrega ${f.descripcion}</b> en ${f.nivel}, posición ${f.posicion} (${f.caras} cara/s).
+        <div class="imp">${imp}</div></div></div>`;
+    });
+    html+=`</div>`;
+  } else {
+    html+=`<div class="card"><div class="statepill ok">Sin ajustes pendientes 🎉</div><div class="sub">Todos los faltantes están justificados o el lineal está completo.</div></div>`;
+  }
+
+  const justFalt=faltantes.filter(f=>f.justified);
+  if(justFalt.length){
+    html+=`<div class="card"><h2>Reporte de agotados / sin espacio</h2><div class="sub">No penalizan tu calificación, pero quedan reportados.</div>`;
+    justFalt.forEach(f=>{ html+=`<div class="action"><div class="txt"><b>${f.descripcion}</b><div class="imp" style="color:var(--amber)">${f.mot}</div></div></div>`; });
+    html+=`</div>`;
+  }
+
+  html+=`<div class="card">
+    <label>Foto final de la implementación (después)</label>
+    <div class="photo-box" onclick="document.getElementById('v-foto2').click()" id="fotoBox2">📷 Foto del lineal terminado</div>
+    <input id="v-foto2" type="file" accept="image/*" capture="environment" class="hidden" onchange="prevFoto(this,'fotoBox2','foto_antes')">
+  </div>
+  <div class="fixedbar">
+    <button class="btn btn-lime" onclick="saveVisit(${apto},${ajustada.toFixed(1)},${novedades.toFixed(1)})">Guardar visita</button>
+    <button class="btn btn-ghost" onclick="goChecklist()">← Volver a ajustar</button>
+  </div>`;
+  document.getElementById('content').innerHTML=html;
+  window._lastScore={apto,ajustada,novedades,plan:plan.length,faltJust:justFalt.length};
+};
+
+/* ---------- SAVE ---------- */
+window.saveVisit=async function(apto,ajustada,novedades){
+  const estado = apto?'pendiente_aprobacion':'por_mejoras';
+  const rec={
+    pdv:visit.pdv, cuerpos:visit.cuerpos, difusion:visit.dif,
+    calif_ajustada:Number(ajustada), calif_novedades:Number(novedades),
+    estado, obs:visit.obs, checks:visit.checks, motivos:visit.motivos,
+    mercaderista:(PROFILE&&PROFILE.nombre)||'', uid:(USER&&USER.uid)||'demo',
+    fecha:Date.now()
+  };
+  if(!db){ toast('DEMO: visita calculada (no se guardó en nube). Estado: '+estado); renderHome(); return; }
+  try{
+    const {collection,addDoc}=window._fs;
+    const {ref,uploadString,getDownloadURL}=window._st;
+    // upload photos (first + last)
+    const stamp=Date.now();
+    if(visit.foto_espacio){ const r=window._st.ref(storage,`visitas/${rec.uid}/${stamp}_antes.jpg`); await uploadString(r,visit.foto_espacio,'data_url'); rec.foto_antes=await getDownloadURL(r); }
+    if(visit.foto_antes){ const r=window._st.ref(storage,`visitas/${rec.uid}/${stamp}_despues.jpg`); await uploadString(r,visit.foto_antes,'data_url'); rec.foto_despues=await getDownloadURL(r); }
+    await addDoc(collection(db,'visitas'),rec);
+    toast('✓ Visita guardada · '+(apto?'Pendiente de aprobación':'Por mejoras'));
+    renderHome();
+  }catch(e){ toast('Error al guardar: '+(e.code||e.message)); }
+};
+
+/* ---------- boot ---------- */
+initFirebase();
+</script>
+</body>
+</html>
