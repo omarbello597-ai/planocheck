@@ -233,7 +233,7 @@ async function initFirebase(){
 function chequearAcceso(){
   if(!PROFILE) return null;
   const e=PROFILE.estado;
-  if(e==='solicitud_pendiente') return {tipo:'pendiente',msg:'Tu solicitud de prueba está en revisión. Te contactaremos pronto para activarla.'};
+  if(e==='solicitud_pendiente') return {tipo:'pendiente',msg:'Tu solicitud de prueba está en revisión. Te contactaremos pronto para activarla. Puedes volver a entrar con tu correo y contraseña cuando quieras para ver si ya fue activada.'};
   if(e==='rechazado') return {tipo:'rechazado',msg:'Tu solicitud no fue aprobada. Para más información escribe a ESGLOB@outlook.com'};
   if(e==='prueba'){
     const dias=diasRestantes();
@@ -246,6 +246,26 @@ function diasRestantes(){
   if(!PROFILE||!PROFILE.vence) return 999;
   return Math.ceil((PROFILE.vence - Date.now())/86400000);
 }
+function mostrarBienvenida(nombre){
+  document.getElementById('screen-login').classList.add('hidden');
+  document.getElementById('screen-app').classList.remove('hidden');
+  document.getElementById('userchip').textContent='';
+  document.getElementById('crumbs').textContent='';
+  document.getElementById('content').innerHTML=`
+    <div class="card" style="text-align:center;padding:34px 22px">
+      <div style="font-size:46px;margin-bottom:6px">🎉</div>
+      <h2>¡Bienvenido${nombre?(', '+nombre):''}!</h2>
+      <div class="sub" style="margin-top:10px">Ya quedaste registrado. Tu solicitud de prueba está <b>en revisión</b> y te contactaremos pronto para activarla.</div>
+      <div class="banner" style="background:#e3f3ea;border-color:var(--ok);color:#0f6e56;margin-top:16px;text-align:left">
+        💡 Puedes ingresar a la aplicación con <b>tu correo y contraseña</b> en cualquier momento para ver el estado de tu solicitud.
+      </div>
+      <button class="btn btn-primary" style="margin-top:18px" onclick="cerrarSesionAVolver()">Entendido, ir al inicio de sesión</button>
+    </div>`;
+}
+window.cerrarSesionAVolver=async function(){
+  if(auth){ const {signOut}=window._au; await signOut(auth); }
+  else showLogin();
+};
 function mostrarBloqueo(b){
   document.getElementById('screen-login').classList.add('hidden');
   document.getElementById('screen-app').classList.remove('hidden');
@@ -315,11 +335,25 @@ document.getElementById('li-btn').onclick=async()=>{
         posible_duplicado:dupFlag};
       await setDoc(doc(db,'usuarios',cred.user.uid),datos);
       await setDoc(doc(db,'solicitudes',cred.user.uid),datos);
-      toast('Solicitud enviada. Te contactaremos para activar tu prueba.');
+      mostrarBienvenida(nombre);
     }else{
       await signInWithEmailAndPassword(auth,email,pass);
     }
-  }catch(e){ toast('Error: '+(e.code||e.message)); }
+  }catch(e){
+    if(e.code==='auth/email-already-in-use'){
+      alert('Este correo ya está registrado.\n\nSi ya tienes cuenta, inicia sesión con tu correo y contraseña.\n\nSi necesitas ayuda, escribe a ESGLOB@outlook.com');
+    } else if(e.code==='auth/weak-password'){
+      toast('La contraseña debe tener al menos 6 caracteres');
+    } else if(e.code==='auth/invalid-email'){
+      toast('El correo no es válido');
+    } else if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'){
+      toast('Correo o contraseña incorrectos');
+    } else if(e.code==='auth/user-not-found'){
+      toast('No existe una cuenta con ese correo');
+    } else {
+      toast('Error: '+(e.code||e.message));
+    }
+  }
 };
 document.getElementById('logout').onclick=async()=>{ if(auth){const{signOut}=window._au;await signOut(auth);} else showLogin(); };
 
@@ -713,7 +747,21 @@ window.activarPrueba=async function(id){
     await updateDoc(doc(db,'usuarios',id),{estado:'prueba',vence,rol:'admin',activado:Date.now(),activado_por:PROFILE.nombre_completo||PROFILE.nombre});
     toast('✓ Prueba de 7 días activada');
     loadAdminTab();
-  }catch(e){ toast('Error: '+(e.code||e.message)); }
+  }catch(e){
+    if(e.code==='auth/email-already-in-use'){
+      alert('Este correo ya está registrado.\n\nSi ya tienes cuenta, inicia sesión con tu correo y contraseña.\n\nSi necesitas ayuda, escribe a ESGLOB@outlook.com');
+    } else if(e.code==='auth/weak-password'){
+      toast('La contraseña debe tener al menos 6 caracteres');
+    } else if(e.code==='auth/invalid-email'){
+      toast('El correo no es válido');
+    } else if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'){
+      toast('Correo o contraseña incorrectos');
+    } else if(e.code==='auth/user-not-found'){
+      toast('No existe una cuenta con ese correo');
+    } else {
+      toast('Error: '+(e.code||e.message));
+    }
+  }
 };
 window.aprobVisita=async function(id){
   const {doc,updateDoc}=window._fs;
