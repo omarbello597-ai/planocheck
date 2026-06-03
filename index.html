@@ -113,6 +113,20 @@ textarea{min-height:70px;resize:vertical}
 .login .switch{text-align:center;color:rgba(255,255,255,.8);font-size:14px;margin-top:18px;cursor:pointer}
 .login .switch b{color:var(--lime)}
 .login .note{background:rgba(255,255,255,.1);border-radius:11px;padding:12px;font-size:12.5px;color:rgba(255,255,255,.8);margin-top:20px;line-height:1.5}
+
+.admtabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.admtab{flex:1;background:none;border:0;padding:10px 4px;font-family:inherit;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
+.admtab.on{color:var(--green);border-bottom-color:var(--lime)}
+.admrow{display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line)}
+.admrow:last-child{border-bottom:0}
+.admrow-main{flex:1;min-width:0}
+.admrow-nm{font-size:14px;font-weight:700}
+.admrow-det{font-size:12px;color:var(--muted);margin-top:2px}
+.admrow-acts{display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0}
+.mini{font-size:12px;font-weight:700;padding:5px 9px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--green);cursor:pointer;text-decoration:none;display:inline-block}
+.mini.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
+.mini.no{background:#fff;color:var(--red);border-color:var(--red)}
+.mini-sel{font-size:11px;padding:4px 6px;border-radius:7px;border:1px solid var(--line);background:#fcfbf7}
 .fixedbar{position:fixed;bottom:0;left:0;right:0;max-width:520px;margin:0 auto;padding:14px 18px;
   background:linear-gradient(transparent,var(--paper) 22%);z-index:15}
 .copyr{text-align:center;font-size:11.5px;color:rgba(255,255,255,.55);margin-top:26px;letter-spacing:.4px}.copyr b{color:rgba(182,230,46,.85);font-weight:600}
@@ -249,13 +263,104 @@ function renderHome(){
     document.getElementById('content').innerHTML=`<div class="card"><div class="banner">Tu cuenta está <b>pendiente de aprobación</b>. Un administrador debe activarla antes de que puedas registrar visitas.</div></div>`;
     return;
   }
+  const isAdmin = PROFILE && PROFILE.rol==='admin';
   document.getElementById('content').innerHTML=`
     <div class="card">
       <h1>Hola 👋</h1>
       <div class="sub">Registra la implementación de una tienda.</div>
       <button class="btn btn-primary" onclick="startVisit()">+ Nueva visita a tienda</button>
+      ${isAdmin?`<button class="btn btn-ghost" style="margin-top:10px" onclick="renderAdmin()">⚙ Panel de administración</button>`:''}
     </div>`;
 }
+
+/* ================= PANEL ADMIN ================= */
+let adminTab='usuarios';
+window.renderAdmin=function(){
+  if(!(PROFILE&&PROFILE.rol==='admin')){toast('Solo administradores');return;}
+  document.getElementById('crumbs').textContent='Administración';
+  document.getElementById('content').innerHTML=`
+    <div class="card">
+      <div class="admtabs">
+        <button class="admtab ${adminTab==='usuarios'?'on':''}" onclick="setAdminTab('usuarios')">Usuarios</button>
+        <button class="admtab ${adminTab==='aprob'?'on':''}" onclick="setAdminTab('aprob')">Por aprobar</button>
+        <button class="admtab ${adminTab==='visitas'?'on':''}" onclick="setAdminTab('visitas')">Visitas</button>
+      </div>
+      <div id="admBody"><div class="sub">Cargando...</div></div>
+    </div>
+    <button class="btn btn-ghost" onclick="renderHome()">← Volver</button>`;
+  loadAdminTab();
+};
+window.setAdminTab=function(t){adminTab=t;renderAdmin();};
+
+async function loadAdminTab(){
+  const body=document.getElementById('admBody');
+  if(!db){body.innerHTML='<div class="sub">Sin conexión.</div>';return;}
+  const {collection,getDocs,query,where,orderBy,doc,updateDoc}=window._fs;
+  try{
+    if(adminTab==='usuarios'||adminTab==='aprob'){
+      const snap=await getDocs(collection(db,'usuarios'));
+      let users=[];snap.forEach(d=>users.push({id:d.id,...d.data()}));
+      if(adminTab==='aprob') users=users.filter(u=>u.estado==='pendiente');
+      if(!users.length){body.innerHTML='<div class="sub">No hay usuarios '+(adminTab==='aprob'?'pendientes':'')+'.</div>';return;}
+      body.innerHTML=users.map(u=>`
+        <div class="admrow">
+          <div class="admrow-main">
+            <div class="admrow-nm">${u.nombre||u.email}</div>
+            <div class="admrow-det">${u.email||''} · <b>${u.rol||'mercaderista'}</b> · ${estadoBadge(u.estado)}</div>
+          </div>
+          <div class="admrow-acts">
+            ${u.estado!=='aprobado'?`<button class="mini ok" onclick="setUser('${u.id}','estado','aprobado')">Aprobar</button>`:''}
+            ${u.estado!=='rechazado'?`<button class="mini no" onclick="setUser('${u.id}','estado','rechazado')">Rechazar</button>`:''}
+            <select class="mini-sel" onchange="setUser('${u.id}','rol',this.value)">
+              <option ${u.rol==='mercaderista'?'selected':''}>mercaderista</option>
+              <option ${u.rol==='supervisor'?'selected':''}>supervisor</option>
+              <option ${u.rol==='admin'?'selected':''}>admin</option>
+            </select>
+          </div>
+        </div>`).join('');
+    } else if(adminTab==='visitas'){
+      const snap=await getDocs(collection(db,'visitas'));
+      let vs=[];snap.forEach(d=>vs.push({id:d.id,...d.data()}));
+      vs.sort((a,b)=>(b.fecha||0)-(a.fecha||0));
+      if(!vs.length){body.innerHTML='<div class="sub">Aún no hay visitas registradas.</div>';return;}
+      body.innerHTML=vs.map(v=>`
+        <div class="admrow">
+          <div class="admrow-main">
+            <div class="admrow-nm">${v.pdv||'—'}</div>
+            <div class="admrow-det">${v.mercaderista||''} · ${new Date(v.fecha).toLocaleDateString()} · Aj ${Math.round(v.calif_ajustada)}% / Nv ${Math.round(v.calif_novedades)}%</div>
+            <div class="admrow-det">${estadoBadge(v.estado)}</div>
+          </div>
+          <div class="admrow-acts">
+            ${v.foto_antes?`<a class="mini" href="${v.foto_antes}" target="_blank">Antes</a>`:''}
+            ${v.foto_despues?`<a class="mini" href="${v.foto_despues}" target="_blank">Después</a>`:''}
+            ${v.estado==='pendiente_aprobacion'?`<button class="mini ok" onclick="aprobVisita('${v.id}')">✓ Ejecutada</button>`:''}
+            ${v.estado==='ejecutada'?`<button class="mini" onclick="reabrirVisita('${v.id}')">Reabrir</button>`:''}
+          </div>
+        </div>`).join('');
+    }
+  }catch(e){body.innerHTML='<div class="sub">Error: '+(e.code||e.message)+'</div>';}
+}
+function estadoBadge(e){
+  const map={pendiente:['#e08a12','Pendiente'],aprobado:['#1c8a5a','Aprobado'],rechazado:['#c0392b','Rechazado'],
+    pendiente_aprobacion:['#e08a12','Pend. aprobación'],por_mejoras:['#c0392b','Por mejoras'],ejecutada:['#1c8a5a','Ejecutada']};
+  const m=map[e]||['#6b7d74',e||'—'];
+  return `<span style="color:${m[0]};font-weight:700">${m[1]}</span>`;
+}
+window.setUser=async function(id,field,val){
+  const {doc,updateDoc}=window._fs;
+  try{await updateDoc(doc(db,'usuarios',id),{[field]:val});toast('Actualizado');loadAdminTab();}
+  catch(e){toast('Error: '+(e.code||e.message));}
+};
+window.aprobVisita=async function(id){
+  const {doc,updateDoc}=window._fs;
+  try{await updateDoc(doc(db,'visitas',id),{estado:'ejecutada',aprobada_por:PROFILE.nombre,aprobada_fecha:Date.now()});toast('✓ Marcada como ejecutada');loadAdminTab();}
+  catch(e){toast('Error: '+(e.code||e.message));}
+};
+window.reabrirVisita=async function(id){
+  const {doc,updateDoc}=window._fs;
+  try{await updateDoc(doc(db,'visitas',id),{estado:'por_mejoras'});toast('Reabierta');loadAdminTab();}
+  catch(e){toast('Error: '+(e.code||e.message));}
+};
 
 /* ---------- STEP 1: PDV + cuerpos ---------- */
 window.startVisit=function(){
