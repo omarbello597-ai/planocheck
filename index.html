@@ -127,6 +127,14 @@ textarea{min-height:70px;resize:vertical}
 .mini.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
 .mini.no{background:#fff;color:var(--red);border-color:var(--red)}
 .mini-sel{font-size:11px;padding:4px 6px;border-radius:7px;border:1px solid var(--line);background:#fcfbf7}
+
+.prodmini{font-size:13px;padding:5px 0;border-bottom:1px solid var(--line);color:var(--ink)}
+.prodmini:last-child{border-bottom:0}
+.prodmini em{color:var(--muted);font-style:normal;font-weight:600}
+.timeline{margin-top:14px}
+.tl{display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.tl span{color:var(--muted)}
+.tl b{color:var(--green);font-weight:700}
 .fixedbar{position:fixed;bottom:0;left:0;right:0;max-width:520px;margin:0 auto;padding:14px 18px;
   background:linear-gradient(transparent,var(--paper) 22%);z-index:15}
 .copyr{text-align:center;font-size:11.5px;color:rgba(255,255,255,.55);margin-top:26px;letter-spacing:.4px}.copyr b{color:rgba(182,230,46,.85);font-weight:600}
@@ -187,91 +195,265 @@ const MOTIVOS = ["Agotado en bodega","Producto nuevo, aún no exhibido","No hay 
 const MOTIVOS_JUST = ["Agotado en bodega","Producto nuevo, aún no exhibido","No hay espacio / reducción de lineal","Descontinuado en esta tienda"]; // these don't penalize ajustada
 
 let FB=null, db=null, auth=null, storage=null, USER=null, PROFILE=null;
-let visit={pdv:null,cuerpos:null,dif:null,checks:{},motivos:{},foto_espacio:null,obs:'',foto_final:null};
+let ficha=null;        // ficha vigente de la tienda en curso
+let visit={pdv:null,cuerpos:null,dif:null,checks:{},motivos:{},obs:''};
 
-/* ---------- Firebase init (uses your config) ---------- */
-const firebaseConfig = window.__FIREBASE_CONFIG__ || null;
+function fichaId(pdv,dif){ return (pdv+'__'+dif).replace(/[\/\.\#\$\[\]]/g,'_'); }
+function fmtDur(ms){ if(!ms||ms<0)return '—'; const m=Math.round(ms/60000); if(m<60)return m+' min'; const h=Math.floor(m/60),mm=m%60; return h+'h '+mm+'min'; }
+function nowStamp(){ return Date.now(); }
 
-async function initFirebase(){
-  if(!firebaseConfig){ 
-    document.getElementById('cfgBanner').textContent='⚠ Falta configurar Firebase. La app corre en modo DEMO (los datos no se guardan en la nube).';
-    return false;
-  }
-  const a=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
-  const au=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
-  const fs=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-  const st=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js');
-  FB=a.initializeApp(firebaseConfig); auth=au.getAuth(FB); db=fs.getFirestore(FB); storage=st.getStorage(FB);
-  window._au=au; window._fs=fs; window._st=st;
-  document.getElementById('cfgBanner').classList.add('hidden');
-  au.onAuthStateChanged(auth, async u=>{
-    if(u){ USER=u; await loadProfile(); showApp(); } else { USER=null; showLogin(); }
-  });
-  return true;
-}
-async function loadProfile(){
-  const {doc,getDoc}=window._fs;
-  try{ const s=await getDoc(doc(db,'usuarios',USER.uid)); PROFILE=s.exists()?s.data():{rol:'mercaderista',estado:'pendiente',nombre:USER.email}; }
-  catch(e){ PROFILE={rol:'mercaderista',estado:'pendiente',nombre:USER.email}; }
-}
-
-/* ---------- UI helpers ---------- */
-function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),2600);}
-function showLogin(){document.getElementById('screen-login').classList.remove('hidden');document.getElementById('screen-app').classList.add('hidden');}
-function showApp(){
-  document.getElementById('screen-login').classList.add('hidden');
-  document.getElementById('screen-app').classList.remove('hidden');
-  document.getElementById('userchip').textContent=(PROFILE&&PROFILE.nombre)||'';
-  renderHome();
-}
-
-/* ---------- LOGIN logic ---------- */
-let signupMode=false;
-document.getElementById('li-switch').onclick=()=>{
-  signupMode=!signupMode;
-  document.getElementById('li-name').classList.toggle('hidden',!signupMode);
-  document.getElementById('li-region').classList.toggle('hidden',!signupMode);
-  document.getElementById('li-btn').textContent=signupMode?'Crear cuenta':'Ingresar';
-  document.getElementById('li-switch').innerHTML=signupMode?'¿Ya tienes cuenta? <b>Ingresa</b>':'¿No tienes cuenta? <b>Regístrate</b>';
-};
-document.getElementById('li-btn').onclick=async()=>{
-  const email=document.getElementById('li-email').value.trim();
-  const pass=document.getElementById('li-pass').value;
-  if(!email||!pass){toast('Completa correo y contraseña');return;}
-  if(!auth){ // DEMO mode
-    PROFILE={rol:'mercaderista',estado:'aprobado',nombre:email.split('@')[0]}; USER={uid:'demo',email}; showApp(); return;
-  }
-  const {createUserWithEmailAndPassword,signInWithEmailAndPassword}=window._au;
-  const {doc,setDoc}=window._fs;
-  try{
-    if(signupMode){
-      const name=document.getElementById('li-name').value.trim();
-      const cred=await createUserWithEmailAndPassword(auth,email,pass);
-      await setDoc(doc(db,'usuarios',cred.user.uid),{nombre:name,email,rol:'mercaderista',estado:'pendiente',region:document.getElementById('li-region').value,creado:Date.now()});
-      toast('Cuenta creada. Espera aprobación del administrador.');
-    }else{
-      await signInWithEmailAndPassword(auth,email,pass);
-    }
-  }catch(e){ toast('Error: '+(e.code||e.message)); }
-};
-document.getElementById('logout').onclick=async()=>{ if(auth){const{signOut}=window._au;await signOut(auth);} else showLogin(); };
-
-/* ---------- HOME ---------- */
-function renderHome(){
-  document.getElementById('crumbs').textContent='Inicio';
-  if(PROFILE&&PROFILE.estado==='pendiente'){
-    document.getElementById('content').innerHTML=`<div class="card"><div class="banner">Tu cuenta está <b>pendiente de aprobación</b>. Un administrador debe activarla antes de que puedas registrar visitas.</div></div>`;
-    return;
-  }
-  const isAdmin = PROFILE && PROFILE.rol==='admin';
+/* ---------- STEP 1: PDV + cuerpos ---------- */
+window.startVisit=function(){
+  visit={pdv:null,cuerpos:null,dif:null,checks:{},motivos:{},obs:''}; ficha=null;
+  document.getElementById('crumbs').textContent='Nueva visita › Tienda';
+  const opts=PDVS.map(p=>`<option value="${p.pdv}">${p.pdv}</option>`).join('');
   document.getElementById('content').innerHTML=`
     <div class="card">
-      <h1>Hola 👋</h1>
-      <div class="sub">Registra la implementación de una tienda.</div>
-      <button class="btn btn-primary" onclick="startVisit()">+ Nueva visita a tienda</button>
-      ${isAdmin?`<button class="btn btn-ghost" style="margin-top:10px" onclick="renderAdmin()">⚙ Panel de administración</button>`:''}
-    </div>`;
+      <h2>1 · Identifica la tienda</h2>
+      <label>Punto de venta</label>
+      <select id="v-pdv"><option value="">Selecciona...</option>${opts}</select>
+      <label>¿Cuántos cuerpos / módulos tiene el lineal?</label>
+      <div class="cuerpos">
+        <div class="cuerpo-opt" id="c1" onclick="pickCuerpo(1)"><div class="big">1</div><div class="lbl">Un cuerpo</div><div class="dif">Difusión 10</div></div>
+        <div class="cuerpo-opt" id="c2" onclick="pickCuerpo(2)"><div class="big">2</div><div class="lbl">Dos cuerpos</div><div class="dif">Difusión 20</div></div>
+      </div>
+    </div>
+    <div class="fixedbar"><button class="btn btn-primary" id="next1" disabled onclick="loadFicha()">Ver planograma a implementar →</button></div>`;
+  document.getElementById('v-pdv').onchange=validate1;
+};
+window.pickCuerpo=function(n){
+  visit.cuerpos=n; visit.dif=n===1?'difusion_10':'difusion_20';
+  document.getElementById('c1').classList.toggle('sel',n===1);
+  document.getElementById('c2').classList.toggle('sel',n===2);
+  validate1();
+};
+function validate1(){
+  visit.pdv=document.getElementById('v-pdv').value;
+  document.getElementById('next1').disabled=!(visit.pdv&&visit.cuerpos);
 }
+window.prevFoto=function(inp,boxid,cb){
+  const f=inp.files[0]; if(!f)return;
+  const r=new FileReader(); r.onload=e=>{ document.getElementById(boxid).innerHTML='✓ Foto cargada<br><img src="'+e.target.result+'">'; if(cb)cb(e.target.result); }; r.readAsDataURL(f);
+};
+
+/* ---------- Cargar o crear ficha de la tienda ---------- */
+window.loadFicha=async function(){
+  const id=fichaId(visit.pdv,visit.dif);
+  if(db){
+    try{ const {doc,getDoc}=window._fs; const s=await getDoc(doc(db,'fichas',id));
+      if(s.exists()) ficha=s.data(); }catch(e){}
+  }
+  if(!ficha){
+    ficha={ id, pdv:visit.pdv, cuerpos:visit.cuerpos, difusion:visit.dif,
+      estado:'sin_iniciar', foto_antes:null, foto_despues:null,
+      checks:{}, motivos:{}, obs:'',
+      t_impl_ini:null, t_impl_fin:null, ms_impl:null,
+      t_aj_ini:null, ms_ajustes:0, ajustes_pendientes:false,
+      calif_ajustada:null, calif_novedades:null,
+      mercaderista:(PROFILE&&PROFILE.nombre)||'', uid:(USER&&USER.uid)||'demo',
+      bitacora:[], creado:nowStamp() };
+  } else {
+    visit.checks=ficha.checks||{}; visit.motivos=ficha.motivos||{};
+  }
+  renderFichaState();
+};
+
+/* ---------- Pantalla según estado de la ficha ---------- */
+function renderFichaState(){
+  document.getElementById('crumbs').textContent='Implementación › '+visit.pdv;
+  const prods=PLANO[visit.dif].productos;
+  const niveles=[...new Set(prods.map(p=>p.nivel))];
+  // resumen del planograma
+  let plan=`<div class="card"><h2>Planograma a implementar</h2>
+     <div class="sub">${visit.pdv} · ${PLANO[visit.dif].nombre} · ${prods.length} productos en ${niveles.length} niveles</div>`;
+  niveles.forEach(nv=>{ const items=prods.filter(p=>p.nivel===nv);
+    plan+=`<div class="lvl-head">${nv} <span>${items.length}</span></div>`;
+    plan+=items.map(p=>`<div class="prodmini"><span class="brand">${p.marca}</span> ${p.descripcion} <em>×${p.caras}</em></div>`).join('');
+  });
+  plan+=`</div>`;
+
+  let body='';
+  const st=ficha.estado;
+  if(st==='sin_iniciar'){
+    body=`<div class="card">
+      <h2>Paso 1 · Foto del ANTES</h2>
+      <div class="sub">Toma la foto del lineal tal como lo encontraste, antes de implementar.</div>
+      <div class="photo-box" onclick="document.getElementById('fa').click()" id="boxAntes">📷 Foto del ANTES</div>
+      <input id="fa" type="file" accept="image/*" capture="environment" class="hidden" onchange="prevFoto(this,'boxAntes',v=>ficha.foto_antes=v)">
+      <label>Observaciones (opcional)</label>
+      <textarea id="v-obs" placeholder="Notas del estado inicial..."></textarea>
+    </div>
+    <div class="fixedbar"><button class="btn btn-primary" onclick="iniciarImpl()">▶ Iniciar implementación</button></div>`;
+  } else if(st==='en_implementacion'){
+    body=`<div class="card">
+      <span class="statepill warn">⏱ Implementación en curso</span>
+      <div class="sub">Iniciada ${new Date(ficha.t_impl_ini).toLocaleTimeString()}. Cuando termines de acomodar el lineal, finaliza y sube la foto del DESPUÉS.</div>
+      <div class="photo-box" onclick="document.getElementById('fd').click()" id="boxDesp">📷 Foto del DESPUÉS</div>
+      <input id="fd" type="file" accept="image/*" capture="environment" class="hidden" onchange="prevFoto(this,'boxDesp',v=>ficha._fotoTmp=v)">
+    </div>
+    <div class="fixedbar"><button class="btn btn-primary" onclick="finalizarImpl()">■ Finalizar implementación</button></div>`;
+  } else if(st==='en_ajustes'){
+    body=`<div class="card">
+      <span class="statepill warn">⏱ Ajustes en curso</span>
+      <div class="sub">Iniciados ${new Date(ficha.t_aj_ini).toLocaleTimeString()}. Realiza los ajustes del plan de acción y sube la nueva foto del DESPUÉS.</div>
+      <div class="photo-box" onclick="document.getElementById('fd2').click()" id="boxDesp2">📷 Nueva foto del DESPUÉS</div>
+      <input id="fd2" type="file" accept="image/*" capture="environment" class="hidden" onchange="prevFoto(this,'boxDesp2',v=>ficha._fotoTmp=v)">
+    </div>
+    <div class="fixedbar"><button class="btn btn-primary" onclick="finalizarAjustes()">✓ Ajustes realizados</button></div>`;
+  } else if(st==='ajustes_pendientes'){
+    body=`<div class="card">
+      <span class="statepill warn">Ajustes pendientes de visita anterior</span>
+      <div class="sub">Esta tienda quedó con ajustes por hacer. Calificación vigente: Ajustada ${ficha.calif_ajustada||0}% / Novedades ${ficha.calif_novedades||0}%. Retoma los ajustes cuando estés lista.</div>
+    </div>
+    <div class="fixedbar"><button class="btn btn-primary" onclick="iniciarAjustes()">▶ Retomar ajustes</button></div>`;
+  } else if(st==='pendiente_aprobacion'||st==='ejecutada'){
+    body=`<div class="card">
+      <span class="statepill ok">${st==='ejecutada'?'✓ Ejecutada':'Pendiente de aprobación'}</span>
+      <div class="sub">Calificación vigente: Ajustada ${ficha.calif_ajustada||0}% / Novedades ${ficha.calif_novedades||0}%. ⏱ Implementación: ${fmtDur(ficha.ms_impl)}${ficha.ms_ajustes?(' · Ajustes: '+fmtDur(ficha.ms_ajustes)):''}</div>
+    </div>
+    <div class="fixedbar"><button class="btn btn-ghost" onclick="iniciarAjustes()">Hacer nuevos ajustes</button></div>`;
+  } else {
+    // estado 'calificar' -> mostrar checklist para calificar
+    body=`<div class="card"><h2>Marca lo implementado</h2><div class="sub">Indica qué quedó presente (✓) o ausente (✗).</div>`;
+    niveles.forEach(nv=>{ const items=prods.filter(p=>p.nivel===nv);
+      body+=`<div class="lvl-head">${nv} <span>${items.length}</span></div>`;
+      items.forEach(p=>{ const id=p.ean+'_'+nv+'_'+p.posicion; const ck=visit.checks[id];
+        body+=`<div class="prod"><div class="meta"><div class="nm">${p.descripcion}</div>
+          <div class="det"><span class="brand">${p.marca}</span>${p.caras} cara(s)</div>
+          <div class="motivo ${ck===false?'':'hidden'}" id="mot_${id}"><select onchange="setMotivo('${id}',this.value)"><option value="">Motivo...</option>${MOTIVOS.map(m=>`<option ${visit.motivos[id]===m?'selected':''}>${m}</option>`).join('')}</select></div>
+          </div><div class="chk">
+          <button class="yes ${ck===true?'on':''}" id="y_${id}" onclick="setChk('${id}',true)">✓</button>
+          <button class="no ${ck===false?'on':''}" id="n_${id}" onclick="setChk('${id}',false)">✗</button>
+          </div></div>`;
+      });
+    });
+    body+=`</div><div class="fixedbar"><button class="btn btn-primary" onclick="calcScore()">Calcular calificación →</button></div>`;
+  }
+  document.getElementById('content').innerHTML=plan+body;
+}
+
+window.iniciarImpl=function(){
+  ficha.obs=(document.getElementById('v-obs')||{}).value||'';
+  if(!ficha.foto_antes){ toast('Toma la foto del ANTES primero'); return; }
+  ficha.t_impl_ini=nowStamp(); ficha.estado='en_implementacion';
+  ficha.bitacora.push({fase:'Inicio implementación',ts:ficha.t_impl_ini,por:ficha.mercaderista});
+  renderFichaState();
+};
+window.finalizarImpl=function(){
+  if(!ficha._fotoTmp){ toast('Sube la foto del DESPUÉS'); return; }
+  ficha.foto_despues=ficha._fotoTmp; delete ficha._fotoTmp;
+  ficha.t_impl_fin=nowStamp(); ficha.ms_impl=ficha.t_impl_fin-ficha.t_impl_ini;
+  ficha.estado='calificar';
+  ficha.bitacora.push({fase:'Fin implementación',ts:ficha.t_impl_fin,por:ficha.mercaderista,dur:ficha.ms_impl});
+  toast('Implementación: '+fmtDur(ficha.ms_impl));
+  renderFichaState();
+};
+window.iniciarAjustes=function(){
+  ficha.t_aj_ini=nowStamp(); ficha.estado='en_ajustes';
+  ficha.bitacora.push({fase:'Inicio ajustes',ts:ficha.t_aj_ini,por:ficha.mercaderista});
+  renderFichaState();
+};
+window.finalizarAjustes=function(){
+  if(!ficha._fotoTmp){ toast('Sube la nueva foto del DESPUÉS'); return; }
+  ficha.foto_despues=ficha._fotoTmp; delete ficha._fotoTmp;  // reemplaza, solo última
+  const dur=nowStamp()-ficha.t_aj_ini; ficha.ms_ajustes=(ficha.ms_ajustes||0)+dur;
+  ficha.estado='calificar';
+  ficha.bitacora.push({fase:'Ajustes realizados',ts:nowStamp(),por:ficha.mercaderista,dur});
+  toast('Ajustes: '+fmtDur(dur));
+  renderFichaState();
+};
+window.aplazarAjustes=async function(){
+  ficha.ajustes_pendientes=true; ficha.estado='ajustes_pendientes';
+  ficha.bitacora.push({fase:'Aplazado a siguiente visita',ts:nowStamp(),por:ficha.mercaderista});
+  await persistFicha(); toast('Guardado. Retomarás los ajustes en la siguiente visita.'); renderHome();
+};
+
+window.setChk=function(id,val){ visit.checks[id]=val;
+  document.getElementById('y_'+id).classList.toggle('on',val);
+  document.getElementById('n_'+id).classList.toggle('on',!val);
+  document.getElementById('mot_'+id).classList.toggle('hidden',val);
+  if(val) delete visit.motivos[id];
+};
+window.setMotivo=function(id,v){ visit.motivos[id]=v; };
+
+/* ---------- Calificación ---------- */
+window.calcScore=function(){
+  const prods=PLANO[visit.dif].productos;
+  let presR=0,totR=0,presW=0,totW=0,justW=0; const faltantes=[];
+  prods.forEach(p=>{ const id=p.ean+'_'+p.nivel+'_'+p.posicion; const w=p.pond_norm||0;
+    const present=visit.checks[id]===true; totR++; totW+=w;
+    if(present){presR++;presW+=w;}
+    else{ const mot=visit.motivos[id]||''; const just=MOTIVOS_JUST.includes(mot);
+      if(just) justW+=w; faltantes.push({...p,mot,just,w}); }
+  });
+  const novedades=totR?presR/totR*100:0;
+  const ajustada=presW/((totW-justW)||1)*100;
+  const apto=ajustada>=90;
+  const plan=faltantes.filter(f=>!f.just).sort((a,b)=>b.w-a.w);
+  ficha.checks=visit.checks; ficha.motivos=visit.motivos;
+  ficha.calif_ajustada=Number(ajustada.toFixed(1)); ficha.calif_novedades=Number(novedades.toFixed(1));
+  window._score={apto,ajustada,novedades,plan,faltJust:faltantes.filter(f=>f.just)};
+
+  document.getElementById('crumbs').textContent='Implementación › Resultado';
+  let html=`<div class="card">
+    <span class="statepill ${apto?'ok':'warn'}">${apto?'✓ Apto para ejecutada (≥90%)':'⚠ Por hacer mejoras (<90%)'}</span>
+    <div class="scorewrap">
+      <div class="score adj"><div class="v">${ajustada.toFixed(0)}%</div><div class="l">Calif. Ajustada</div></div>
+      <div class="score nov"><div class="v">${novedades.toFixed(0)}%</div><div class="l">Calif. Novedades</div></div>
+    </div>
+    <div class="timeline">
+      <div class="tl"><span>⏱ Implementación</span><b>${fmtDur(ficha.ms_impl)}</b></div>
+      ${ficha.ms_ajustes?`<div class="tl"><span>⏱ Ajustes acumulados</span><b>${fmtDur(ficha.ms_ajustes)}</b></div>`:''}
+    </div>
+  </div>`;
+  if(plan.length){
+    html+=`<div class="card"><h2>Plan de acción</h2><div class="sub">Ordenado por impacto en ventas.</div>`;
+    plan.forEach((f,i)=>{ const imp=f.w>0?`+${(f.w*100).toFixed(1)}% del lineal en ventas`:'sin venta registrada';
+      html+=`<div class="action"><div class="rank">${i+1}</div><div class="txt"><b>Agrega ${f.descripcion}</b> en ${f.nivel}, pos. ${f.posicion} (${f.caras} cara/s).<div class="imp">${imp}</div></div></div>`; });
+    html+=`</div>`;
+  }
+  const justFalt=window._score.faltJust;
+  if(justFalt.length){
+    html+=`<div class="card"><h2>Reporte de agotados / sin espacio</h2><div class="sub">No penalizan la calificación.</div>`;
+    justFalt.forEach(f=>{html+=`<div class="action"><div class="txt"><b>${f.descripcion}</b><div class="imp" style="color:var(--amber)">${f.mot}</div></div></div>`;});
+    html+=`</div>`;
+  }
+  // acciones según resultado
+  html+=`<div class="fixedbar">`;
+  if(apto){
+    html+=`<button class="btn btn-lime" onclick="guardarFicha('pendiente_aprobacion')">Guardar · enviar a aprobación</button>`;
+  } else {
+    html+=`<button class="btn btn-primary" onclick="iniciarAjustes()">▶ Iniciar ajustes ahora</button>`;
+    html+=`<button class="btn btn-ghost" onclick="aplazarAjustes()">Dejar ajustes para la siguiente visita</button>`;
+  }
+  html+=`</div>`;
+  document.getElementById('content').innerHTML=html;
+};
+
+/* ---------- Persistencia ---------- */
+async function persistFicha(){
+  if(!db){ return true; }
+  const {doc,setDoc}=window._fs;
+  const {ref,uploadString,getDownloadURL}=window._st;
+  try{
+    if(ficha.foto_antes && ficha.foto_antes.startsWith('data:')){
+      const r=ref(storage,`fichas/${ficha.uid}/${ficha.id}_antes.jpg`); await uploadString(r,ficha.foto_antes,'data_url'); ficha.foto_antes=await getDownloadURL(r);
+    }
+    if(ficha.foto_despues && ficha.foto_despues.startsWith('data:')){
+      const r=ref(storage,`fichas/${ficha.uid}/${ficha.id}_despues.jpg`); await uploadString(r,ficha.foto_despues,'data_url'); ficha.foto_despues=await getDownloadURL(r);
+    }
+    delete ficha._fotoTmp;
+    await setDoc(doc(db,'fichas',ficha.id), ficha);
+    return true;
+  }catch(e){ toast('Error al guardar: '+(e.code||e.message)); return false; }
+}
+window.guardarFicha=async function(estado){
+  ficha.estado=estado; ficha.actualizado=nowStamp();
+  ficha.bitacora.push({fase:estado==='pendiente_aprobacion'?'Enviado a aprobación':estado,ts:nowStamp(),por:ficha.mercaderista,aj:ficha.calif_ajustada,nv:ficha.calif_novedades});
+  const ok=await persistFicha();
+  if(ok){ toast('✓ Guardado'); renderHome(); }
+};
+
 
 /* ================= PANEL ADMIN ================= */
 let adminTab='usuarios';
