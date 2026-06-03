@@ -173,7 +173,7 @@ const MOTIVOS = ["Agotado en bodega","Producto nuevo, aún no exhibido","No hay 
 const MOTIVOS_JUST = ["Agotado en bodega","Producto nuevo, aún no exhibido","No hay espacio / reducción de lineal","Descontinuado en esta tienda"]; // these don't penalize ajustada
 
 let FB=null, db=null, auth=null, storage=null, USER=null, PROFILE=null;
-let visit={pdv:null,cuerpos:null,dif:null,checks:{},motivos:{},foto_espacio:null,obs:'',foto_antes:null};
+let visit={pdv:null,cuerpos:null,dif:null,checks:{},motivos:{},foto_espacio:null,obs:'',foto_final:null};
 
 /* ---------- Firebase init (uses your config) ---------- */
 const firebaseConfig = window.__FIREBASE_CONFIG__ || null;
@@ -259,7 +259,7 @@ function renderHome(){
 
 /* ---------- STEP 1: PDV + cuerpos ---------- */
 window.startVisit=function(){
-  visit={pdv:null,cuerpos:null,dif:null,checks:{},motivos:{},foto_espacio:null,obs:'',foto_antes:null};
+  visit={pdv:null,cuerpos:null,dif:null,checks:{},motivos:{},foto_espacio:null,obs:'',foto_final:null};
   document.getElementById('crumbs').textContent='Nueva visita › Tienda';
   const opts=PDVS.map(p=>`<option value="${p.pdv}">${p.pdv}</option>`).join('');
   document.getElementById('content').innerHTML=`
@@ -393,10 +393,10 @@ window.calcScore=function(){
   html+=`<div class="card">
     <label>Foto final de la implementación (después)</label>
     <div class="photo-box" onclick="document.getElementById('v-foto2').click()" id="fotoBox2">📷 Foto del lineal terminado</div>
-    <input id="v-foto2" type="file" accept="image/*" capture="environment" class="hidden" onchange="prevFoto(this,'fotoBox2','foto_antes')">
+    <input id="v-foto2" type="file" accept="image/*" capture="environment" class="hidden" onchange="prevFoto(this,'fotoBox2','foto_final')">
   </div>
   <div class="fixedbar">
-    <button class="btn btn-lime" onclick="saveVisit(${apto},${ajustada.toFixed(1)},${novedades.toFixed(1)})">Guardar visita</button>
+    <button class="btn btn-lime" onclick="saveVisit()">Guardar visita</button>
     <button class="btn btn-ghost" onclick="goChecklist()">← Volver a ajustar</button>
   </div>`;
   document.getElementById('content').innerHTML=html;
@@ -404,7 +404,8 @@ window.calcScore=function(){
 };
 
 /* ---------- SAVE ---------- */
-window.saveVisit=async function(apto,ajustada,novedades){
+window.saveVisit=async function(){
+  const apto=window._lastScore.apto, ajustada=window._lastScore.ajustada, novedades=window._lastScore.novedades;
   const estado = apto?'pendiente_aprobacion':'por_mejoras';
   const rec={
     pdv:visit.pdv, cuerpos:visit.cuerpos, difusion:visit.dif,
@@ -417,10 +418,10 @@ window.saveVisit=async function(apto,ajustada,novedades){
   try{
     const {collection,addDoc}=window._fs;
     const {ref,uploadString,getDownloadURL}=window._st;
-    // upload photos (first + last)
+    // upload photos: foto_espacio = ANTES (paso 1), foto_final = DESPUES (paso 3)
     const stamp=Date.now();
-    if(visit.foto_espacio){ const r=window._st.ref(storage,`visitas/${rec.uid}/${stamp}_antes.jpg`); await uploadString(r,visit.foto_espacio,'data_url'); rec.foto_antes=await getDownloadURL(r); }
-    if(visit.foto_antes){ const r=window._st.ref(storage,`visitas/${rec.uid}/${stamp}_despues.jpg`); await uploadString(r,visit.foto_antes,'data_url'); rec.foto_despues=await getDownloadURL(r); }
+    if(visit.foto_espacio){ const r=ref(storage,`visitas/${rec.uid}/${stamp}_antes.jpg`); await uploadString(r,visit.foto_espacio,'data_url'); rec.foto_antes=await getDownloadURL(r); }
+    if(visit.foto_final){ const r=ref(storage,`visitas/${rec.uid}/${stamp}_despues.jpg`); await uploadString(r,visit.foto_final,'data_url'); rec.foto_despues=await getDownloadURL(r); }
     await addDoc(collection(db,'visitas'),rec);
     toast('✓ Visita guardada · '+(apto?'Pendiente de aprobación':'Por mejoras'));
     renderHome();
