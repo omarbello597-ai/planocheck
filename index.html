@@ -195,6 +195,91 @@ const MOTIVOS = ["Agotado en bodega","Producto nuevo, aún no exhibido","No hay 
 const MOTIVOS_JUST = ["Agotado en bodega","Producto nuevo, aún no exhibido","No hay espacio / reducción de lineal","Descontinuado en esta tienda"]; // these don't penalize ajustada
 
 let FB=null, db=null, auth=null, storage=null, USER=null, PROFILE=null;
+
+/* ---------- Firebase init (uses your config) ---------- */
+const firebaseConfig = window.__FIREBASE_CONFIG__ || null;
+
+async function initFirebase(){
+  if(!firebaseConfig){ 
+    document.getElementById('cfgBanner').textContent='⚠ Falta configurar Firebase. La app corre en modo DEMO (los datos no se guardan en la nube).';
+    return false;
+  }
+  const a=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+  const au=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+  const fs=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  const st=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js');
+  FB=a.initializeApp(firebaseConfig); auth=au.getAuth(FB); db=fs.getFirestore(FB); storage=st.getStorage(FB);
+  window._au=au; window._fs=fs; window._st=st;
+  document.getElementById('cfgBanner').classList.add('hidden');
+  au.onAuthStateChanged(auth, async u=>{
+    if(u){ USER=u; await loadProfile(); showApp(); } else { USER=null; showLogin(); }
+  });
+  return true;
+}
+async function loadProfile(){
+  const {doc,getDoc}=window._fs;
+  try{ const s=await getDoc(doc(db,'usuarios',USER.uid)); PROFILE=s.exists()?s.data():{rol:'mercaderista',estado:'pendiente',nombre:USER.email}; }
+  catch(e){ PROFILE={rol:'mercaderista',estado:'pendiente',nombre:USER.email}; }
+}
+
+/* ---------- UI helpers ---------- */
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),2600);}
+function showLogin(){document.getElementById('screen-login').classList.remove('hidden');document.getElementById('screen-app').classList.add('hidden');}
+function showApp(){
+  document.getElementById('screen-login').classList.add('hidden');
+  document.getElementById('screen-app').classList.remove('hidden');
+  document.getElementById('userchip').textContent=(PROFILE&&PROFILE.nombre)||'';
+  renderHome();
+}
+
+/* ---------- LOGIN logic ---------- */
+let signupMode=false;
+document.getElementById('li-switch').onclick=()=>{
+  signupMode=!signupMode;
+  document.getElementById('li-name').classList.toggle('hidden',!signupMode);
+  document.getElementById('li-region').classList.toggle('hidden',!signupMode);
+  document.getElementById('li-btn').textContent=signupMode?'Crear cuenta':'Ingresar';
+  document.getElementById('li-switch').innerHTML=signupMode?'¿Ya tienes cuenta? <b>Ingresa</b>':'¿No tienes cuenta? <b>Regístrate</b>';
+};
+document.getElementById('li-btn').onclick=async()=>{
+  const email=document.getElementById('li-email').value.trim();
+  const pass=document.getElementById('li-pass').value;
+  if(!email||!pass){toast('Completa correo y contraseña');return;}
+  if(!auth){ // DEMO mode
+    PROFILE={rol:'mercaderista',estado:'aprobado',nombre:email.split('@')[0]}; USER={uid:'demo',email}; showApp(); return;
+  }
+  const {createUserWithEmailAndPassword,signInWithEmailAndPassword}=window._au;
+  const {doc,setDoc}=window._fs;
+  try{
+    if(signupMode){
+      const name=document.getElementById('li-name').value.trim();
+      const cred=await createUserWithEmailAndPassword(auth,email,pass);
+      await setDoc(doc(db,'usuarios',cred.user.uid),{nombre:name,email,rol:'mercaderista',estado:'pendiente',region:document.getElementById('li-region').value,creado:Date.now()});
+      toast('Cuenta creada. Espera aprobación del administrador.');
+    }else{
+      await signInWithEmailAndPassword(auth,email,pass);
+    }
+  }catch(e){ toast('Error: '+(e.code||e.message)); }
+};
+document.getElementById('logout').onclick=async()=>{ if(auth){const{signOut}=window._au;await signOut(auth);} else showLogin(); };
+
+/* ---------- HOME ---------- */
+function renderHome(){
+  document.getElementById('crumbs').textContent='Inicio';
+  if(PROFILE&&PROFILE.estado==='pendiente'){
+    document.getElementById('content').innerHTML=`<div class="card"><div class="banner">Tu cuenta está <b>pendiente de aprobación</b>. Un administrador debe activarla antes de que puedas registrar visitas.</div></div>`;
+    return;
+  }
+  const isAdmin = PROFILE && PROFILE.rol==='admin';
+  document.getElementById('content').innerHTML=`
+    <div class="card">
+      <h1>Hola 👋</h1>
+      <div class="sub">Registra la implementación de una tienda.</div>
+      <button class="btn btn-primary" onclick="startVisit()">+ Nueva visita a tienda</button>
+      ${isAdmin?`<button class="btn btn-ghost" style="margin-top:10px" onclick="renderAdmin()">⚙ Panel de administración</button>`:''}
+    </div>`;
+}
+
 let ficha=null;        // ficha vigente de la tienda en curso
 let visit={pdv:null,cuerpos:null,dif:null,checks:{},motivos:{},obs:''};
 
