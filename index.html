@@ -131,6 +131,9 @@ textarea{min-height:70px;resize:vertical}
 .prodmini{font-size:13px;padding:5px 0;border-bottom:1px solid var(--line);color:var(--ink)}
 .prodmini:last-child{border-bottom:0}
 .prodmini em{color:var(--muted);font-style:normal;font-weight:600}
+
+.prodmini .posnum{display:inline-block;min-width:20px;height:20px;line-height:20px;text-align:center;background:var(--green);color:#fff;border-radius:6px;font-size:11px;font-weight:700;margin-right:6px}
+.prodmini .eanline{font-size:11px;color:var(--muted);margin-top:2px;font-family:monospace;letter-spacing:.3px}
 .timeline{margin-top:14px}
 .tl{display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
 .tl span{color:var(--muted)}
@@ -141,6 +144,7 @@ textarea{min-height:70px;resize:vertical}
 .copyr-app{text-align:center;font-size:11px;color:var(--muted);padding:18px 0 8px;letter-spacing:.3px}.copyr-app b{color:var(--green-l);font-weight:600}
 .banner{background:#fdf0db;border:1px solid var(--amber);color:#7a4a06;padding:11px 14px;border-radius:11px;font-size:13px;font-weight:600;margin-bottom:14px}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -153,8 +157,15 @@ textarea{min-height:70px;resize:vertical}
     <input id="li-email" type="email" placeholder="tu@correo.com" autocomplete="email">
     <label>Contraseña</label>
     <input id="li-pass" type="password" placeholder="••••••••" autocomplete="current-password">
-    <input id="li-name" class="hidden" type="text" placeholder="Tu nombre completo">
-    <select id="li-region" class="hidden"><option value="">Región...</option><option>Bogotá / Cundinamarca / Boyacá</option></select>
+    <div id="signupFields" class="hidden">
+      <input id="li-nombre" type="text" placeholder="Nombre">
+      <input id="li-apellido" type="text" placeholder="Apellido">
+      <input id="li-pais" type="text" placeholder="País">
+      <input id="li-ciudad" type="text" placeholder="Ciudad">
+      <input id="li-empresa" type="text" placeholder="Empresa">
+      <input id="li-marca" type="text" placeholder="Marca">
+      <input id="li-cel" type="tel" placeholder="Celular de contacto">
+    </div>
     <button id="li-btn" class="btn btn-lime">Ingresar</button>
     <div class="switch" id="li-switch">¿No tienes cuenta? <b>Regístrate</b></div>
     <div class="note">Tras registrarte, un administrador debe aprobar tu cuenta antes de poder registrar visitas.</div>
@@ -212,9 +223,41 @@ async function initFirebase(){
   window._au=au; window._fs=fs; window._st=st;
   document.getElementById('cfgBanner').classList.add('hidden');
   au.onAuthStateChanged(auth, async u=>{
-    if(u){ USER=u; await loadProfile(); showApp(); } else { USER=null; showLogin(); }
+    if(u){ USER=u; await loadProfile(); 
+      const bloqueo=chequearAcceso();
+      if(bloqueo){ mostrarBloqueo(bloqueo); } else { showApp(); }
+    } else { USER=null; showLogin(); }
   });
   return true;
+}
+function chequearAcceso(){
+  if(!PROFILE) return null;
+  const e=PROFILE.estado;
+  if(e==='solicitud_pendiente') return {tipo:'pendiente',msg:'Tu solicitud de prueba está en revisión. Te contactaremos pronto para activarla.'};
+  if(e==='rechazado') return {tipo:'rechazado',msg:'Tu solicitud no fue aprobada. Para más información escribe a ESGLOB@outlook.com'};
+  if(e==='prueba'){
+    const dias=diasRestantes();
+    if(dias<0) return {tipo:'vencida',msg:'Tu prueba gratis de 7 días terminó. Para continuar usando PlanoCheck, contacta a ESGLOB@outlook.com'};
+  }
+  if(e==='suspendido') return {tipo:'suspendido',msg:'Tu cuenta está suspendida. Contacta a ESGLOB@outlook.com'};
+  return null;
+}
+function diasRestantes(){
+  if(!PROFILE||!PROFILE.vence) return 999;
+  return Math.ceil((PROFILE.vence - Date.now())/86400000);
+}
+function mostrarBloqueo(b){
+  document.getElementById('screen-login').classList.add('hidden');
+  document.getElementById('screen-app').classList.remove('hidden');
+  document.getElementById('userchip').textContent=(PROFILE&&PROFILE.nombre_completo)||'';
+  document.getElementById('crumbs').textContent='';
+  document.getElementById('content').innerHTML=`
+    <div class="card" style="text-align:center;padding:32px 20px">
+      <div style="font-size:40px;margin-bottom:8px">${b.tipo==='pendiente'?'⏳':b.tipo==='vencida'?'⌛':'🔒'}</div>
+      <h2>${b.tipo==='pendiente'?'Solicitud en revisión':b.tipo==='vencida'?'Prueba finalizada':'Acceso restringido'}</h2>
+      <div class="sub" style="margin-top:10px">${b.msg}</div>
+      <a class="btn btn-lime" style="margin-top:18px;text-decoration:none;display:block" href="mailto:ESGLOB@outlook.com">Contactar a ESGLOB</a>
+    </div>`;
 }
 async function loadProfile(){
   const {doc,getDoc}=window._fs;
@@ -225,7 +268,7 @@ async function loadProfile(){
 /* ---------- UI helpers ---------- */
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),2600);}
 function showLogin(){document.getElementById('screen-login').classList.remove('hidden');document.getElementById('screen-app').classList.add('hidden');}
-function showApp(){
+async function showApp(){ await loadPlanogramasFromDB();
   document.getElementById('screen-login').classList.add('hidden');
   document.getElementById('screen-app').classList.remove('hidden');
   document.getElementById('userchip').textContent=(PROFILE&&PROFILE.nombre)||'';
@@ -236,10 +279,9 @@ function showApp(){
 let signupMode=false;
 document.getElementById('li-switch').onclick=()=>{
   signupMode=!signupMode;
-  document.getElementById('li-name').classList.toggle('hidden',!signupMode);
-  document.getElementById('li-region').classList.toggle('hidden',!signupMode);
-  document.getElementById('li-btn').textContent=signupMode?'Crear cuenta':'Ingresar';
-  document.getElementById('li-switch').innerHTML=signupMode?'¿Ya tienes cuenta? <b>Ingresa</b>':'¿No tienes cuenta? <b>Regístrate</b>';
+  document.getElementById('signupFields').classList.toggle('hidden',!signupMode);
+  document.getElementById('li-btn').textContent=signupMode?'Solicitar prueba gratis':'Ingresar';
+  document.getElementById('li-switch').innerHTML=signupMode?'¿Ya tienes cuenta? <b>Ingresa</b>':'¿Quieres probarlo? <b>Solicita prueba gratis</b>';
 };
 document.getElementById('li-btn').onclick=async()=>{
   const email=document.getElementById('li-email').value.trim();
@@ -252,10 +294,28 @@ document.getElementById('li-btn').onclick=async()=>{
   const {doc,setDoc}=window._fs;
   try{
     if(signupMode){
-      const name=document.getElementById('li-name').value.trim();
+      const nombre=document.getElementById('li-nombre').value.trim();
+      const apellido=document.getElementById('li-apellido').value.trim();
+      const pais=document.getElementById('li-pais').value.trim();
+      const ciudad=document.getElementById('li-ciudad').value.trim();
+      const empresa=document.getElementById('li-empresa').value.trim();
+      const marca=document.getElementById('li-marca').value.trim();
+      const cel=document.getElementById('li-cel').value.trim();
+      if(!nombre||!apellido||!empresa||!cel){toast('Completa nombre, apellido, empresa y celular');return;}
+      // chequeo de duplicados por email o celular
+      const {collection,query,where,getDocs,doc,setDoc}=window._fs;
+      try{
+        const dupE=await getDocs(query(collection(db,'solicitudes'),where('email','==',email)));
+        const dupC=await getDocs(query(collection(db,'solicitudes'),where('cel','==',cel)));
+        var dupFlag=(!dupE.empty)||(!dupC.empty);
+      }catch(e){ var dupFlag=false; }
       const cred=await createUserWithEmailAndPassword(auth,email,pass);
-      await setDoc(doc(db,'usuarios',cred.user.uid),{nombre:name,email,rol:'mercaderista',estado:'pendiente',region:document.getElementById('li-region').value,creado:Date.now()});
-      toast('Cuenta creada. Espera aprobación del administrador.');
+      const datos={nombre,apellido,nombre_completo:nombre+' '+apellido,email,pais,ciudad,empresa,marca,cel,
+        rol:'mercaderista',estado:'solicitud_pendiente',creado:Date.now(),
+        posible_duplicado:dupFlag};
+      await setDoc(doc(db,'usuarios',cred.user.uid),datos);
+      await setDoc(doc(db,'solicitudes',cred.user.uid),datos);
+      toast('Solicitud enviada. Te contactaremos para activar tu prueba.');
     }else{
       await signInWithEmailAndPassword(auth,email,pass);
     }
@@ -271,7 +331,13 @@ function renderHome(){
     return;
   }
   const isAdmin = PROFILE && PROFILE.rol==='admin';
+  let trialBanner='';
+  if(PROFILE && PROFILE.estado==='prueba'){
+    const d=diasRestantes();
+    trialBanner=`<div class="banner" style="background:#e3f3ea;border-color:var(--ok);color:#0f6e56">🎁 Prueba gratis activa · te quedan <b>${d} día${d===1?'':'s'}</b>. Para continuar luego, escribe a ESGLOB@outlook.com</div>`;
+  }
   document.getElementById('content').innerHTML=`
+    ${trialBanner}
     <div class="card">
       <h1>Hola 👋</h1>
       <div class="sub">Registra la implementación de una tienda.</div>
@@ -346,14 +412,14 @@ window.loadFicha=async function(){
 /* ---------- Pantalla según estado de la ficha ---------- */
 function renderFichaState(){
   document.getElementById('crumbs').textContent='Implementación › '+visit.pdv;
-  const prods=PLANO[visit.dif].productos;
+  const prods=getPlano(visit.dif).productos;
   const niveles=[...new Set(prods.map(p=>p.nivel))];
   // resumen del planograma
   let plan=`<div class="card"><h2>Planograma a implementar</h2>
-     <div class="sub">${visit.pdv} · ${PLANO[visit.dif].nombre} · ${prods.length} productos en ${niveles.length} niveles</div>`;
+     <div class="sub">${visit.pdv} · ${getPlano(visit.dif).nombre} · ${prods.length} productos en ${niveles.length} niveles</div>`;
   niveles.forEach(nv=>{ const items=prods.filter(p=>p.nivel===nv);
     plan+=`<div class="lvl-head">${nv} <span>${items.length}</span></div>`;
-    plan+=items.map(p=>`<div class="prodmini"><span class="brand">${p.marca}</span> ${p.descripcion} <em>×${p.caras}</em></div>`).join('');
+    plan+=items.map((p,i)=>`<div class="prodmini"><span class="posnum">${i+1}</span><span class="brand">${p.marca}</span> ${p.descripcion} <em>×${p.caras}</em><div class="eanline">EAN: ${p.ean}</div></div>`).join('');
   });
   plan+=`</div>`;
 
@@ -463,7 +529,7 @@ window.setMotivo=function(id,v){ visit.motivos[id]=v; };
 
 /* ---------- Calificación ---------- */
 window.calcScore=function(){
-  const prods=PLANO[visit.dif].productos;
+  const prods=getPlano(visit.dif).productos;
   let presR=0,totR=0,presW=0,totW=0,justW=0; const faltantes=[];
   prods.forEach(p=>{ const id=p.ean+'_'+p.nivel+'_'+p.posicion; const w=p.pond_norm||0;
     const present=visit.checks[id]===true; totR++; totW+=w;
@@ -549,8 +615,9 @@ window.renderAdmin=function(){
     <div class="card">
       <div class="admtabs">
         <button class="admtab ${adminTab==='usuarios'?'on':''}" onclick="setAdminTab('usuarios')">Usuarios</button>
-        <button class="admtab ${adminTab==='aprob'?'on':''}" onclick="setAdminTab('aprob')">Por aprobar</button>
+        <button class="admtab ${adminTab==='solic'?'on':''}" onclick="setAdminTab('solic')">Solicitudes</button>
         <button class="admtab ${adminTab==='visitas'?'on':''}" onclick="setAdminTab('visitas')">Visitas</button>
+        <button class="admtab ${adminTab==='planos'?'on':''}" onclick="setAdminTab('planos')">Planogramas</button>
       </div>
       <div id="admBody"><div class="sub">Cargando...</div></div>
     </div>
@@ -585,6 +652,27 @@ async function loadAdminTab(){
             </select>
           </div>
         </div>`).join('');
+    } else if(adminTab==='solic'){
+      const snap=await getDocs(collection(db,'usuarios'));
+      let users=[];snap.forEach(d=>users.push({id:d.id,...d.data()}));
+      const sol=users.filter(u=>u.estado==='solicitud_pendiente');
+      if(!sol.length){body.innerHTML='<div class="sub">No hay solicitudes de prueba pendientes.</div>';return;}
+      body.innerHTML=sol.map(u=>`
+        <div class="admrow">
+          <div class="admrow-main">
+            <div class="admrow-nm">${u.nombre_completo||u.email} ${u.posible_duplicado?'<span style="color:var(--red);font-size:11px">⚠ posible duplicado</span>':''}</div>
+            <div class="admrow-det">${u.empresa||''} ${u.marca?('· '+u.marca):''}</div>
+            <div class="admrow-det">📧 ${u.email||''}</div>
+            <div class="admrow-det">📱 ${u.cel||''} · ${u.ciudad||''}, ${u.pais||''}</div>
+          </div>
+          <div class="admrow-acts">
+            <button class="mini ok" onclick="activarPrueba('${u.id}')">✓ Activar 7 días</button>
+            <button class="mini no" onclick="setUser('${u.id}','estado','rechazado')">Rechazar</button>
+          </div>
+        </div>`).join('');
+      return;
+    } else if(adminTab==='planos'){
+      renderPlanosTab(body); return;
     } else if(adminTab==='visitas'){
       const snap=await getDocs(collection(db,'visitas'));
       let vs=[];snap.forEach(d=>vs.push({id:d.id,...d.data()}));
@@ -618,6 +706,15 @@ window.setUser=async function(id,field,val){
   try{await updateDoc(doc(db,'usuarios',id),{[field]:val});toast('Actualizado');loadAdminTab();}
   catch(e){toast('Error: '+(e.code||e.message));}
 };
+window.activarPrueba=async function(id){
+  const {doc,updateDoc}=window._fs;
+  const vence=Date.now()+7*86400000;
+  try{
+    await updateDoc(doc(db,'usuarios',id),{estado:'prueba',vence,rol:'admin',activado:Date.now(),activado_por:PROFILE.nombre_completo||PROFILE.nombre});
+    toast('✓ Prueba de 7 días activada');
+    loadAdminTab();
+  }catch(e){ toast('Error: '+(e.code||e.message)); }
+};
 window.aprobVisita=async function(id){
   const {doc,updateDoc}=window._fs;
   try{await updateDoc(doc(db,'visitas',id),{estado:'ejecutada',aprobada_por:PROFILE.nombre,aprobada_fecha:Date.now()});toast('✓ Marcada como ejecutada');loadAdminTab();}
@@ -628,6 +725,132 @@ window.reabrirVisita=async function(id){
   try{await updateDoc(doc(db,'visitas',id),{estado:'por_mejoras'});toast('Reabierta');loadAdminTab();}
   catch(e){toast('Error: '+(e.code||e.message));}
 };
+
+
+/* ============ GESTIÓN DE PLANOGRAMAS (admin) ============ */
+let PLANO_OVERRIDE=null; // planogramas cargados desde Firestore (reemplazan a los embebidos)
+
+async function loadPlanogramasFromDB(){
+  if(!db) return;
+  try{
+    const {collection,getDocs}=window._fs;
+    const snap=await getDocs(collection(db,'planogramas'));
+    if(!snap.empty){
+      PLANO_OVERRIDE={};
+      snap.forEach(d=>{ const data=d.data(); PLANO_OVERRIDE[d.id]={nombre:data.nombre,cuerpos:data.cuerpos,productos:data.productos}; });
+    }
+  }catch(e){ console.log('No se pudieron cargar planogramas DB:',e.message); }
+}
+function getPlano(difKey){
+  if(PLANO_OVERRIDE && PLANO_OVERRIDE[difKey]) return PLANO_OVERRIDE[difKey];
+  return PLANO[difKey];
+}
+
+let _planoPreview=null;
+function renderPlanosTab(body){
+  body.innerHTML=`
+    <div class="sub">Carga o actualiza los planogramas que verán las mercaderistas. Descarga la plantilla, complétala y súbela.</div>
+    <button class="btn btn-ghost" onclick="descargarPlantilla()" style="margin-bottom:10px">⬇ Descargar plantilla Excel</button>
+    <div class="photo-box" onclick="document.getElementById('xlsxin').click()" id="xlsxbox">📄 Subir Excel del planograma</div>
+    <input id="xlsxin" type="file" accept=".xlsx,.xls" class="hidden" onchange="leerExcelPlano(this)">
+    <div id="planoPreview"></div>
+    <div id="planosList" style="margin-top:16px"></div>`;
+  listarPlanogramas();
+}
+
+window.descargarPlantilla=function(){
+  // build a minimal template client-side with SheetJS
+  const wb=XLSX.utils.book_new();
+  const cab=[['campo','valor'],['nombre_planograma',''],['region',''],['difusion','1'],['descripcion','']];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(cab),'Cabecera');
+  const cols=[['region','difusion','nivel','posicion','ean','descripcion','marca','caras','pond_ventas']];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(cols),'Planograma');
+  XLSX.writeFile(wb,'Plantilla_Planograma.xlsx');
+};
+
+window.leerExcelPlano=function(inp){
+  const f=inp.files[0]; if(!f) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const cab=XLSX.utils.sheet_to_json(wb.Sheets['Cabecera']||{},{header:1});
+      const cabMap={}; cab.forEach(r=>{ if(r[0]) cabMap[String(r[0]).trim()]=r[1]; });
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets['Planograma']||{},{defval:''});
+      if(!rows.length){ toast('La hoja "Planograma" está vacía'); return; }
+      // normalize products
+      const prods=rows.filter(r=>r.ean).map(r=>({
+        nivel:String(r.nivel||'').trim(), posicion:Number(r.posicion)||0,
+        ean:String(r.ean).trim(), descripcion:String(r.descripcion||'').trim(),
+        marca:String(r.marca||'').trim(), caras:Number(r.caras)||1,
+        pond_ventas:Number(r.pond_ventas)||0
+      }));
+      // normalize ponderación to sum 1
+      let s=prods.reduce((a,p)=>a+p.pond_ventas,0);
+      prods.forEach(p=>p.pond_norm = s>0? p.pond_ventas/s : 1/prods.length);
+      const cuerpos=Number(cabMap.difusion)||1;
+      const difKey = cuerpos===2?'difusion_20':'difusion_10';
+      const niveles=[...new Set(prods.map(p=>p.nivel))];
+      _planoPreview={
+        id:difKey, nombre:(cuerpos===2?'2 cuerpos':'1 cuerpo'), cuerpos,
+        region:cabMap.region||'', nombre_plano:cabMap.nombre_planograma||difKey,
+        productos:prods
+      };
+      // preview
+      document.getElementById('planoPreview').innerHTML=`
+        <div class="card" style="margin-top:12px;border:2px solid var(--lime)">
+          <h2>Vista previa</h2>
+          <div class="sub">${_planoPreview.nombre_plano}</div>
+          <div class="timeline">
+            <div class="tl"><span>Difusión</span><b>${cuerpos} cuerpo(s)</b></div>
+            <div class="tl"><span>Productos</span><b>${prods.length}</b></div>
+            <div class="tl"><span>Niveles</span><b>${niveles.length}</b></div>
+            <div class="tl"><span>EANs únicos</span><b>${new Set(prods.map(p=>p.ean)).size}</b></div>
+            <div class="tl"><span>Suma ponderación</span><b>${(s*100).toFixed(1)}%</b></div>
+          </div>
+          ${prods.length<3?'<div class="banner">⚠ Muy pocos productos, revisa el archivo.</div>':''}
+          <button class="btn btn-lime" style="margin-top:12px" onclick="guardarPlanograma()">✓ Confirmar y guardar</button>
+        </div>`;
+      toast('Excel leído: '+prods.length+' productos');
+    }catch(err){ toast('Error al leer Excel: '+err.message); }
+  };
+  reader.readAsArrayBuffer(f);
+};
+
+window.guardarPlanograma=async function(){
+  if(!_planoPreview){ return; }
+  if(!db){ toast('Sin conexión'); return; }
+  try{
+    const {doc,setDoc}=window._fs;
+    await setDoc(doc(db,'planogramas',_planoPreview.id),{
+      nombre:_planoPreview.nombre, cuerpos:_planoPreview.cuerpos,
+      region:_planoPreview.region, nombre_plano:_planoPreview.nombre_plano,
+      productos:_planoPreview.productos, actualizado:Date.now(), por:PROFILE.nombre
+    });
+    toast('✓ Planograma guardado');
+    await loadPlanogramasFromDB();
+    _planoPreview=null; document.getElementById('planoPreview').innerHTML='';
+    listarPlanogramas();
+  }catch(e){ toast('Error al guardar: '+(e.code||e.message)); }
+};
+
+async function listarPlanogramas(){
+  const cont=document.getElementById('planosList'); if(!cont) return;
+  if(!db){ cont.innerHTML=''; return; }
+  try{
+    const {collection,getDocs}=window._fs;
+    const snap=await getDocs(collection(db,'planogramas'));
+    if(snap.empty){ cont.innerHTML='<div class="sub">No hay planogramas cargados. Se usan los predeterminados (Dif 10 y 20).</div>'; return; }
+    let html='<div class="lvl-head">Planogramas cargados</div>';
+    snap.forEach(d=>{ const x=d.data();
+      html+=`<div class="admrow"><div class="admrow-main">
+        <div class="admrow-nm">${x.nombre_plano||d.id}</div>
+        <div class="admrow-det">${x.cuerpos} cuerpo(s) · ${(x.productos||[]).length} productos · ${x.region||''}</div>
+      </div></div>`;
+    });
+    cont.innerHTML=html;
+  }catch(e){ cont.innerHTML='<div class="sub">Error: '+e.message+'</div>'; }
+}
 
 /* ---------- boot ---------- */
 initFirebase();
