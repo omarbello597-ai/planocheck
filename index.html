@@ -695,22 +695,21 @@ async function loadAdminTab(){
       if(adminTab==='aprob') users=users.filter(u=>u.estado==='pendiente');
       const btnCrear=(PROFILE.rol==='admin_empresa'||PROFILE.rol==='admin')&&adminTab==='usuarios'?`<button class="btn btn-lime" style="margin-bottom:14px" onclick="formNuevoMercaderista()">+ Crear mercaderista</button>`:'';
       if(!users.length){body.innerHTML=btnCrear+'<div class="sub">No hay usuarios '+(adminTab==='aprob'?'pendientes':'')+'.</div>';return;}
-      body.innerHTML=btnCrear+users.map(u=>`
+      body.innerHTML=btnCrear+users.map(u=>{
+        const esYo = u.id===USER.uid;
+        const esAdminEmp = u.rol==='admin_empresa';
+        const puedeAccionar = !esYo && !esAdminEmp; // no actuar sobre uno mismo ni sobre el admin de empresa
+        return `
         <div class="admrow">
           <div class="admrow-main">
-            <div class="admrow-nm">${u.nombre||u.email}</div>
+            <div class="admrow-nm">${u.nombre_completo||u.nombre||u.email}${esYo?' <span style="font-size:11px;color:var(--muted)">(tú)</span>':''}</div>
             <div class="admrow-det">${u.email||''} · <b>${u.rol||'mercaderista'}</b> · ${estadoBadge(u.estado,u.vence)}</div>
           </div>
           <div class="admrow-acts">
-            ${u.estado!=='aprobado'?`<button class="mini ok" onclick="setUser('${u.id}','estado','aprobado')">Aprobar</button>`:''}
-            ${u.estado!=='rechazado'?`<button class="mini no" onclick="setUser('${u.id}','estado','rechazado')">Rechazar</button>`:''}
-            <select class="mini-sel" onchange="setUser('${u.id}','rol',this.value)">
-              <option ${u.rol==='mercaderista'?'selected':''}>mercaderista</option>
-              <option ${u.rol==='supervisor'?'selected':''}>supervisor</option>
-              <option ${u.rol==='admin'?'selected':''}>admin</option>
-            </select>
+            ${puedeAccionar&&u.estado!=='aprobado'&&u.estado!=='prueba'?`<button class="mini ok" onclick="setUser('${u.id}','estado','aprobado')">Aprobar</button>`:''}
+            ${puedeAccionar&&u.estado!=='rechazado'?`<button class="mini no" onclick="setUser('${u.id}','estado','rechazado')">Rechazar</button>`:''}
           </div>
-        </div>`).join('');
+        </div>`;}).join('');
     } else if(adminTab==='solic'){
       const snap=await getDocs(collection(db,'usuarios'));
       let users=[];snap.forEach(d=>users.push({id:d.id,...d.data()}));
