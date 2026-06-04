@@ -737,14 +737,18 @@ function estadoBadge(e){
 }
 window.setUser=async function(id,field,val){
   const {doc,updateDoc}=window._fs;
-  try{await updateDoc(doc(db,'usuarios',id),{[field]:val});toast('Actualizado');loadAdminTab();}
-  catch(e){toast('Error: '+(e.code||e.message));}
+  try{
+    await updateDoc(doc(db,'usuarios',id),{[field]:val});
+    if(field==='estado'){ try{ await updateDoc(doc(db,'solicitudes',id),{estado:val}); }catch(e){} }
+    toast('Actualizado');loadAdminTab();
+  }catch(e){toast('Error: '+(e.code||e.message));}
 };
 window.activarPrueba=async function(id){
   const {doc,updateDoc}=window._fs;
   const vence=Date.now()+7*86400000;
   try{
-    await updateDoc(doc(db,'usuarios',id),{estado:'prueba',vence,rol:'admin',activado:Date.now(),activado_por:PROFILE.nombre_completo||PROFILE.nombre});
+    await updateDoc(doc(db,'usuarios',id),{estado:'prueba',vence,rol:'mercaderista',activado:Date.now(),activado_por:PROFILE.nombre_completo||PROFILE.nombre});
+    try{ await updateDoc(doc(db,'solicitudes',id),{estado:'prueba',vence,activado:Date.now()}); }catch(e){}
     toast('✓ Prueba de 7 días activada');
     loadAdminTab();
   }catch(e){
