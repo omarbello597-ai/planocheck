@@ -458,8 +458,8 @@ window.loadFicha=async function(){
       t_impl_ini:null, t_impl_fin:null, ms_impl:null,
       t_aj_ini:null, ms_ajustes:0, ajustes_pendientes:false,
       calif_ajustada:null, calif_novedades:null,
-      mercaderista:(PROFILE&&PROFILE.nombre)||'', uid:(USER&&USER.uid)||'demo',
-      bitacora:[], creado:nowStamp() };
+      mercaderista:(PROFILE&&PROFILE.nombre_completo)||(PROFILE&&PROFILE.nombre)||'', uid:(USER&&USER.uid)||'demo',
+      empresa_id:(PROFILE&&PROFILE.empresa_id)||'', bitacora:[], creado:nowStamp() };
   } else {
     visit.checks=ficha.checks||{}; visit.motivos=ficha.motivos||{};
   }
@@ -691,9 +691,11 @@ async function loadAdminTab(){
     if(adminTab==='usuarios'||adminTab==='aprob'){
       const snap=await getDocs(collection(db,'usuarios'));
       let users=[];snap.forEach(d=>users.push({id:d.id,...d.data()}));
+      if(PROFILE.rol==='admin_empresa'){ users=users.filter(u=>u.empresa_id===PROFILE.empresa_id); }
       if(adminTab==='aprob') users=users.filter(u=>u.estado==='pendiente');
-      if(!users.length){body.innerHTML='<div class="sub">No hay usuarios '+(adminTab==='aprob'?'pendientes':'')+'.</div>';return;}
-      body.innerHTML=users.map(u=>`
+      const btnCrear=(PROFILE.rol==='admin_empresa'||PROFILE.rol==='admin')&&adminTab==='usuarios'?`<button class="btn btn-lime" style="margin-bottom:14px" onclick="formNuevoMercaderista()">+ Crear mercaderista</button>`:'';
+      if(!users.length){body.innerHTML=btnCrear+'<div class="sub">No hay usuarios '+(adminTab==='aprob'?'pendientes':'')+'.</div>';return;}
+      body.innerHTML=btnCrear+users.map(u=>`
         <div class="admrow">
           <div class="admrow-main">
             <div class="admrow-nm">${u.nombre||u.email}</div>
@@ -733,6 +735,7 @@ async function loadAdminTab(){
     } else if(adminTab==='visitas'){
       const snap=await getDocs(collection(db,'visitas'));
       let vs=[];snap.forEach(d=>vs.push({id:d.id,...d.data()}));
+      if(PROFILE.rol==='admin_empresa'){ vs=vs.filter(v=>v.empresa_id===PROFILE.empresa_id); }
       vs.sort((a,b)=>(b.fecha||0)-(a.fecha||0));
       if(!vs.length){body.innerHTML='<div class="sub">Aún no hay visitas registradas.</div>';return;}
       body.innerHTML=vs.map(v=>`
@@ -809,6 +812,52 @@ window.reabrirVisita=async function(id){
 };
 
 
+/* ============ CREAR MERCADERISTA (admin de empresa) ============ */
+window.formNuevoMercaderista=function(){
+  document.getElementById('crumbs').textContent='Administración › Nuevo mercaderista';
+  document.getElementById('content').innerHTML=`
+    <div class="card">
+      <h2>Crear mercaderista</h2>
+      <div class="sub">Se unirá a tu empresa. Recibirá acceso con el correo y contraseña que definas.</div>
+      <label>Nombre completo</label><input id="nm-nombre" type="text" placeholder="Nombre y apellido">
+      <label>Correo</label><input id="nm-email" type="email" placeholder="correo@empresa.com">
+      <label>Contraseña inicial</label><input id="nm-pass" type="text" placeholder="mínimo 6 caracteres">
+      <label>Celular (opcional)</label><input id="nm-cel" type="tel" placeholder="Celular">
+    </div>
+    <div class="fixedbar">
+      <button class="btn btn-primary" onclick="crearMercaderista()">Crear mercaderista</button>
+      <button class="btn btn-ghost" onclick="renderAdmin()">← Cancelar</button>
+    </div>`;
+};
+window.crearMercaderista=async function(){
+  const nombre=document.getElementById('nm-nombre').value.trim();
+  const email=document.getElementById('nm-email').value.trim();
+  const pass=document.getElementById('nm-pass').value;
+  const cel=document.getElementById('nm-cel').value.trim();
+  if(!nombre||!email||!pass){ toast('Completa nombre, correo y contraseña'); return; }
+  if(pass.length<6){ toast('La contraseña debe tener mínimo 6 caracteres'); return; }
+  try{
+    // instancia secundaria para no desloguear al admin actual
+    const segApp=window._appModule.initializeApp(window._fbcfg,'segundo_'+Date.now());
+    const segAuth=window._au.getAuth(segApp);
+    const cred=await window._au.createUserWithEmailAndPassword(segAuth,email,pass);
+    const {doc,setDoc}=window._fs;
+    await setDoc(doc(db,'usuarios',cred.user.uid),{
+      nombre, nombre_completo:nombre, email, cel,
+      rol:'mercaderista', estado:'aprobado',
+      empresa_id:PROFILE.empresa_id, empresa:PROFILE.empresa||'',
+      creado:Date.now(), creado_por:PROFILE.nombre_completo||PROFILE.nombre
+    });
+    await window._au.signOut(segAuth);
+    toast('✓ Mercaderista creado');
+    renderAdmin();
+  }catch(e){
+    if(e.code==='auth/email-already-in-use') toast('Ese correo ya está registrado');
+    else if(e.code==='auth/weak-password') toast('Contraseña muy débil (mín 6)');
+    else toast('Error: '+(e.code||e.message));
+  }
+};
+
 /* ============ PANEL SUPER-ADMIN (ESGLOB) ============ */
 window.renderSuperAdmin=async function(){
   if(!(PROFILE&&PROFILE.rol==='super_admin')){toast('Solo ESGLOB');return;}
@@ -872,7 +921,13 @@ async function loadPlanogramasFromDB(){
     const snap=await getDocs(collection(db,'planogramas'));
     if(!snap.empty){
       PLANO_OVERRIDE={};
-      snap.forEach(d=>{ const data=d.data(); PLANO_OVERRIDE[d.id]={nombre:data.nombre,cuerpos:data.cuerpos,productos:data.productos}; });
+      const miEmpresa=(PROFILE&&PROFILE.empresa_id)||'';
+      const esSuper=(PROFILE&&PROFILE.rol==='super_admin');
+      snap.forEach(d=>{ const data=d.data();
+        if(esSuper || data.empresa_id===miEmpresa || !data.empresa_id){
+          PLANO_OVERRIDE[d.id]={nombre:data.nombre,cuerpos:data.cuerpos,productos:data.productos};
+        }
+      });
     }
   }catch(e){ console.log('No se pudieron cargar planogramas DB:',e.message); }
 }
@@ -960,7 +1015,7 @@ window.guardarPlanograma=async function(){
     await setDoc(doc(db,'planogramas',_planoPreview.id),{
       nombre:_planoPreview.nombre, cuerpos:_planoPreview.cuerpos,
       region:_planoPreview.region, nombre_plano:_planoPreview.nombre_plano,
-      productos:_planoPreview.productos, actualizado:Date.now(), por:PROFILE.nombre
+      productos:_planoPreview.productos, actualizado:Date.now(), por:PROFILE.nombre_completo||PROFILE.nombre, empresa_id:PROFILE.empresa_id||''
     });
     toast('✓ Planograma guardado');
     await loadPlanogramasFromDB();
@@ -975,11 +1030,13 @@ async function listarPlanogramas(){
   try{
     const {collection,getDocs}=window._fs;
     const snap=await getDocs(collection(db,'planogramas'));
-    if(snap.empty){ cont.innerHTML='<div class="sub">No hay planogramas cargados. Se usan los predeterminados (Dif 10 y 20).</div>'; return; }
+    let docs=[];snap.forEach(d=>docs.push({id:d.id,...d.data()}));
+    if(PROFILE.rol==='admin_empresa'){ docs=docs.filter(x=>x.empresa_id===PROFILE.empresa_id); }
+    if(!docs.length){ cont.innerHTML='<div class="sub">No hay planogramas cargados aún.</div>'; return; }
     let html='<div class="lvl-head">Planogramas cargados</div>';
-    snap.forEach(d=>{ const x=d.data();
+    docs.forEach(x=>{
       html+=`<div class="admrow"><div class="admrow-main">
-        <div class="admrow-nm">${x.nombre_plano||d.id}</div>
+        <div class="admrow-nm">${x.nombre_plano||x.id}</div>
         <div class="admrow-det">${x.cuerpos} cuerpo(s) · ${(x.productos||[]).length} productos · ${x.region||''}</div>
       </div></div>`;
     });
