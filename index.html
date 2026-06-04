@@ -294,8 +294,26 @@ async function loadProfile(){
     try{ await setDoc(doc(db,'usuarios',USER.uid),PROFILE,{merge:true}); }catch(e){}
     return;
   }
-  try{ const s=await getDoc(doc(db,'usuarios',USER.uid)); PROFILE=s.exists()?s.data():{rol:'mercaderista',estado:'pendiente',nombre:USER.email}; }
-  catch(e){ PROFILE={rol:'mercaderista',estado:'pendiente',nombre:USER.email}; }
+  try{
+    const s=await getDoc(doc(db,'usuarios',USER.uid));
+    PROFILE = s.exists()? s.data() : {rol:'mercaderista',estado:'pendiente',nombre:USER.email,email:USER.email};
+    // FUENTE CONFIABLE: si este usuario es fundador de una empresa, derivar su rol/estado de ahí
+    try{
+      const e=await getDoc(doc(db,'empresas',USER.uid));
+      if(e.exists()){
+        const emp=e.data();
+        PROFILE.rol='admin_empresa';
+        PROFILE.empresa_id=USER.uid;
+        PROFILE.empresa=emp.nombre_empresa||PROFILE.empresa||'';
+        if(emp.estado==='empresa_activa'){ PROFILE.estado='prueba'; if(emp.vence) PROFILE.vence=emp.vence; }
+        else if(emp.estado==='empresa_pendiente'){ PROFILE.estado='empresa_pendiente'; }
+        else if(emp.estado==='empresa_rechazada'){ PROFILE.estado='rechazado'; }
+        if(!PROFILE.nombre_completo) PROFILE.nombre_completo=emp.admin_nombre||'';
+        if(!PROFILE.nombre) PROFILE.nombre=(emp.admin_nombre||'').split(' ')[0]||USER.email;
+      }
+    }catch(err){}
+  }
+  catch(e){ PROFILE={rol:'mercaderista',estado:'pendiente',nombre:USER.email,email:USER.email}; }
 }
 
 /* ---------- UI helpers ---------- */
@@ -835,24 +853,28 @@ window.crearMercaderista=async function(){
   const cel=document.getElementById('nm-cel').value.trim();
   if(!nombre||!email||!pass){ toast('Completa nombre, correo y contraseña'); return; }
   if(pass.length<6){ toast('La contraseña debe tener mínimo 6 caracteres'); return; }
+  let segApp=null;
   try{
     // instancia secundaria para no desloguear al admin actual
-    const segApp=window._appModule.initializeApp(window._fbcfg,'segundo_'+Date.now());
+    segApp=window._appModule.initializeApp(window._fbcfg,'segundo_'+Date.now());
     const segAuth=window._au.getAuth(segApp);
     const cred=await window._au.createUserWithEmailAndPassword(segAuth,email,pass);
+    const nuevoUid=cred.user.uid;
+    await window._au.signOut(segAuth);
+    // El documento lo escribe el ADMIN (sesión actual), que sí tiene permiso por reglas
     const {doc,setDoc}=window._fs;
-    await setDoc(doc(db,'usuarios',cred.user.uid),{
+    await setDoc(doc(db,'usuarios',nuevoUid),{
       nombre, nombre_completo:nombre, email, cel,
       rol:'mercaderista', estado:'aprobado',
       empresa_id:PROFILE.empresa_id, empresa:PROFILE.empresa||'',
       creado:Date.now(), creado_por:PROFILE.nombre_completo||PROFILE.nombre
     });
-    await window._au.signOut(segAuth);
     toast('✓ Mercaderista creado');
     renderAdmin();
   }catch(e){
     if(e.code==='auth/email-already-in-use') toast('Ese correo ya está registrado');
     else if(e.code==='auth/weak-password') toast('Contraseña muy débil (mín 6)');
+    else if(e.code==='permission-denied') toast('Sin permiso para crear (revisa reglas)');
     else toast('Error: '+(e.code||e.message));
   }
 };
@@ -890,12 +912,12 @@ window.renderSuperAdmin=async function(){
   }catch(err){ body.innerHTML='<div class="sub">Error: '+err.message+'</div>'; }
 };
 window.aprobarEmpresa=async function(empresaId){
-  const {doc,updateDoc}=window._fs;
+  const {doc,updateDoc,setDoc}=window._fs;
   const vence=Date.now()+7*86400000;
   try{
     await updateDoc(doc(db,'empresas',empresaId),{estado:'empresa_activa',vence,activada:Date.now()});
-    // activar también al usuario admin fundador (su uid == empresaId)
-    await updateDoc(doc(db,'usuarios',empresaId),{estado:'prueba',vence,rol:'admin_empresa'});
+    // activar al usuario admin fundador (su uid == empresaId). setDoc+merge: crea o actualiza sin fallar.
+    await setDoc(doc(db,'usuarios',empresaId),{estado:'prueba',vence,rol:'admin_empresa',empresa_id:empresaId},{merge:true});
     toast('✓ Empresa activada · prueba 7 días');
     renderSuperAdmin();
   }catch(e){ toast('Error: '+(e.code||e.message)); }
