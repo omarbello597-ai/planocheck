@@ -666,7 +666,7 @@ window.guardarFicha=async function(estado){
 /* ================= PANEL ADMIN ================= */
 let adminTab='usuarios';
 window.renderAdmin=function(){
-  if(!(PROFILE&&PROFILE.rol==='admin')){toast('Solo administradores');return;}
+  if(!(PROFILE&&['admin','admin_empresa','super_admin'].includes(PROFILE.rol))){toast('Solo administradores');return;}
   document.getElementById('crumbs').textContent='Administración';
   document.getElementById('content').innerHTML=`
     <div class="card">
