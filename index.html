@@ -225,7 +225,7 @@ async function initFirebase(){
   const fs=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
   const st=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js');
   FB=a.initializeApp(firebaseConfig); auth=au.getAuth(FB); db=fs.getFirestore(FB); storage=st.getStorage(FB);
-  window._au=au; window._fs=fs; window._st=st;
+  window._au=au; window._fs=fs; window._st=st; window._appModule=a; window._fbcfg=firebaseConfig;
   document.getElementById('cfgBanner').classList.add('hidden');
   au.onAuthStateChanged(auth, async u=>{
     if(u){ USER=u; await loadProfile(); 
