@@ -158,12 +158,15 @@ textarea{min-height:70px;resize:vertical}
     <label>Contraseña</label>
     <input id="li-pass" type="password" placeholder="••••••••" autocomplete="current-password">
     <div id="signupFields" class="hidden">
+      <div style="font-size:12px;color:rgba(255,255,255,.7);margin:8px 0 4px;font-weight:600">DATOS DE LA EMPRESA</div>
+      <input id="li-empresa" type="text" placeholder="Nombre de la empresa">
+      <input id="li-categoria" type="text" placeholder="Categoría que maneja (ej: cuidado del auto)">
+      <input id="li-marca" type="text" placeholder="Marca(s) principal(es)">
+      <div style="font-size:12px;color:rgba(255,255,255,.7);margin:12px 0 4px;font-weight:600">TUS DATOS (ADMINISTRADOR)</div>
       <input id="li-nombre" type="text" placeholder="Nombre">
       <input id="li-apellido" type="text" placeholder="Apellido">
       <input id="li-pais" type="text" placeholder="País">
       <input id="li-ciudad" type="text" placeholder="Ciudad">
-      <input id="li-empresa" type="text" placeholder="Empresa">
-      <input id="li-marca" type="text" placeholder="Marca">
       <input id="li-cel" type="tel" placeholder="Celular de contacto">
     </div>
     <button id="li-btn" class="btn btn-lime">Ingresar</button>
@@ -205,6 +208,8 @@ const PDVS = [{"pdv": "079 - Exito Viva Tunja-7701001007908", "depto": "Boyacá"
 const MOTIVOS = ["Agotado en bodega","Producto nuevo, aún no exhibido","No hay espacio / reducción de lineal","Descontinuado en esta tienda","Otro"];
 const MOTIVOS_JUST = ["Agotado en bodega","Producto nuevo, aún no exhibido","No hay espacio / reducción de lineal","Descontinuado en esta tienda"]; // these don't penalize ajustada
 
+const SUPER_ADMINS=['esglob@outlook.com','omarbello597@gmail.com']; // dueños del sistema
+function esSuperAdmin(email){ return email && SUPER_ADMINS.includes(email.toLowerCase()); }
 let FB=null, db=null, auth=null, storage=null, USER=null, PROFILE=null;
 
 /* ---------- Firebase init (uses your config) ---------- */
@@ -232,7 +237,9 @@ async function initFirebase(){
 }
 function chequearAcceso(){
   if(!PROFILE) return null;
+  if(PROFILE.rol==='super_admin') return null;
   const e=PROFILE.estado;
+  if(e==='empresa_pendiente') return {tipo:'pendiente',msg:'El registro de tu empresa está en revisión. Te contactaremos pronto para activar tu prueba de 7 días. Puedes volver a entrar cuando quieras para ver el estado.'};
   if(e==='solicitud_pendiente') return {tipo:'pendiente',msg:'Tu solicitud de prueba está en revisión. Te contactaremos pronto para activarla. Puedes volver a entrar con tu correo y contraseña cuando quieras para ver si ya fue activada.'};
   if(e==='rechazado') return {tipo:'rechazado',msg:'Tu solicitud no fue aprobada. Para más información escribe a ESGLOB@outlook.com'};
   if(e==='prueba'){
@@ -280,7 +287,13 @@ function mostrarBloqueo(b){
     </div>`;
 }
 async function loadProfile(){
-  const {doc,getDoc}=window._fs;
+  const {doc,getDoc,setDoc}=window._fs;
+  // Super-admin: reconocido por email, sin importar lo que diga la BD
+  if(esSuperAdmin(USER.email)){
+    PROFILE={rol:'super_admin',estado:'aprobado',nombre:'ESGLOB',nombre_completo:'Super Admin ESGLOB',email:USER.email,empresa_id:'ESGLOB'};
+    try{ await setDoc(doc(db,'usuarios',USER.uid),PROFILE,{merge:true}); }catch(e){}
+    return;
+  }
   try{ const s=await getDoc(doc(db,'usuarios',USER.uid)); PROFILE=s.exists()?s.data():{rol:'mercaderista',estado:'pendiente',nombre:USER.email}; }
   catch(e){ PROFILE={rol:'mercaderista',estado:'pendiente',nombre:USER.email}; }
 }
@@ -300,8 +313,8 @@ let signupMode=false;
 document.getElementById('li-switch').onclick=()=>{
   signupMode=!signupMode;
   document.getElementById('signupFields').classList.toggle('hidden',!signupMode);
-  document.getElementById('li-btn').textContent=signupMode?'Solicitar prueba gratis':'Ingresar';
-  document.getElementById('li-switch').innerHTML=signupMode?'¿Ya tienes cuenta? <b>Ingresa</b>':'¿Quieres probarlo? <b>Solicita prueba gratis</b>';
+  document.getElementById('li-btn').textContent=signupMode?'Registrar mi empresa':'Ingresar';
+  document.getElementById('li-switch').innerHTML=signupMode?'¿Ya tienes cuenta? <b>Ingresa</b>':'¿Tu empresa quiere probarlo? <b>Regístrala gratis</b>';
 };
 document.getElementById('li-btn').onclick=async()=>{
   const email=document.getElementById('li-email').value.trim();
@@ -314,27 +327,27 @@ document.getElementById('li-btn').onclick=async()=>{
   const {doc,setDoc}=window._fs;
   try{
     if(signupMode){
+      const empresa=document.getElementById('li-empresa').value.trim();
+      const categoria=document.getElementById('li-categoria').value.trim();
+      const marca=document.getElementById('li-marca').value.trim();
       const nombre=document.getElementById('li-nombre').value.trim();
       const apellido=document.getElementById('li-apellido').value.trim();
       const pais=document.getElementById('li-pais').value.trim();
       const ciudad=document.getElementById('li-ciudad').value.trim();
-      const empresa=document.getElementById('li-empresa').value.trim();
-      const marca=document.getElementById('li-marca').value.trim();
       const cel=document.getElementById('li-cel').value.trim();
-      if(!nombre||!apellido||!empresa||!cel){toast('Completa nombre, apellido, empresa y celular');return;}
-      // chequeo de duplicados por email o celular
+      if(!empresa||!nombre||!apellido||!cel){toast('Completa empresa, nombre, apellido y celular');return;}
       const {collection,query,where,getDocs,doc,setDoc}=window._fs;
-      try{
-        const dupE=await getDocs(query(collection(db,'solicitudes'),where('email','==',email)));
-        const dupC=await getDocs(query(collection(db,'solicitudes'),where('cel','==',cel)));
-        var dupFlag=(!dupE.empty)||(!dupC.empty);
-      }catch(e){ var dupFlag=false; }
+      // chequeo duplicados por email
+      try{ const dupE=await getDocs(query(collection(db,'empresas'),where('email_admin','==',email))); var dupFlag=!dupE.empty; }catch(e){ var dupFlag=false; }
       const cred=await createUserWithEmailAndPassword(auth,email,pass);
-      const datos={nombre,apellido,nombre_completo:nombre+' '+apellido,email,pais,ciudad,empresa,marca,cel,
-        rol:'mercaderista',estado:'solicitud_pendiente',creado:Date.now(),
-        posible_duplicado:dupFlag};
-      await setDoc(doc(db,'usuarios',cred.user.uid),datos);
-      await setDoc(doc(db,'solicitudes',cred.user.uid),datos);
+      const empresaId=cred.user.uid; // la empresa se identifica por el uid de su admin fundador
+      const datosEmpresa={empresa_id:empresaId,nombre_empresa:empresa,categoria,marca,pais,ciudad,
+        admin_nombre:nombre+' '+apellido,email_admin:email,cel,
+        estado:'empresa_pendiente',creado:Date.now(),posible_duplicado:dupFlag};
+      const datosUsuario={empresa_id:empresaId,nombre,apellido,nombre_completo:nombre+' '+apellido,
+        email,pais,ciudad,empresa,marca,cel,rol:'admin_empresa',estado:'empresa_pendiente',creado:Date.now()};
+      await setDoc(doc(db,'empresas',empresaId),datosEmpresa);
+      await setDoc(doc(db,'usuarios',cred.user.uid),datosUsuario);
       mostrarBienvenida(nombre);
     }else{
       await signInWithEmailAndPassword(auth,email,pass);
@@ -364,7 +377,17 @@ function renderHome(){
     document.getElementById('content').innerHTML=`<div class="card"><div class="banner">Tu cuenta está <b>pendiente de aprobación</b>. Un administrador debe activarla antes de que puedas registrar visitas.</div></div>`;
     return;
   }
-  const isAdmin = PROFILE && PROFILE.rol==='admin';
+  const isSuper = PROFILE && PROFILE.rol==='super_admin';
+  if(isSuper){
+    document.getElementById('content').innerHTML=`
+      <div class="card">
+        <h1>Panel ESGLOB 🛡️</h1>
+        <div class="sub">Super-administrador. Gestiona las empresas de PlanoCheck.</div>
+        <button class="btn btn-primary" onclick="renderSuperAdmin()">🏢 Empresas registradas</button>
+      </div>`;
+    return;
+  }
+  const isAdmin = PROFILE && (PROFILE.rol==='admin'||PROFILE.rol==='admin_empresa');
   let trialBanner='';
   if(PROFILE && PROFILE.estado==='prueba'){
     const d=diasRestantes();
@@ -785,6 +808,59 @@ window.reabrirVisita=async function(id){
   catch(e){toast('Error: '+(e.code||e.message));}
 };
 
+
+/* ============ PANEL SUPER-ADMIN (ESGLOB) ============ */
+window.renderSuperAdmin=async function(){
+  if(!(PROFILE&&PROFILE.rol==='super_admin')){toast('Solo ESGLOB');return;}
+  document.getElementById('crumbs').textContent='ESGLOB › Empresas';
+  document.getElementById('content').innerHTML=`<div class="card"><h2>Empresas</h2><div id="empBody"><div class="sub">Cargando...</div></div></div><button class="btn btn-ghost" onclick="renderHome()">← Volver</button>`;
+  const body=document.getElementById('empBody');
+  try{
+    const {collection,getDocs}=window._fs;
+    const snap=await getDocs(collection(db,'empresas'));
+    let emps=[];snap.forEach(d=>emps.push({id:d.id,...d.data()}));
+    emps.sort((a,b)=>(b.creado||0)-(a.creado||0));
+    if(!emps.length){body.innerHTML='<div class="sub">Aún no hay empresas registradas.</div>';return;}
+    body.innerHTML=emps.map(e=>{
+      const estadoTxt = e.estado==='empresa_pendiente'?'<span style="color:#e08a12;font-weight:700">Pendiente</span>'
+        : e.estado==='empresa_activa'?`<span style="color:#0f6e56;font-weight:700">Activa${e.vence?(' · '+Math.max(0,Math.ceil((e.vence-Date.now())/86400000))+' días'):''}</span>`
+        : e.estado==='empresa_rechazada'?'<span style="color:#c0392b;font-weight:700">Rechazada</span>'
+        : e.estado;
+      return `<div class="admrow">
+        <div class="admrow-main">
+          <div class="admrow-nm">${e.nombre_empresa||'—'} ${e.posible_duplicado?'<span style="color:var(--red);font-size:11px">⚠ dup</span>':''}</div>
+          <div class="admrow-det">${e.categoria||''} ${e.marca?('· '+e.marca):''}</div>
+          <div class="admrow-det">👤 ${e.admin_nombre||''} · ${estadoTxt}</div>
+          <div class="admrow-det">📧 ${e.email_admin||''}</div>
+          <div class="admrow-det">📱 ${e.cel||''} · ${e.ciudad||''}, ${e.pais||''}</div>
+        </div>
+        <div class="admrow-acts">
+          ${e.estado==='empresa_pendiente'?`<button class="mini ok" onclick="aprobarEmpresa('${e.id}')">✓ Activar 7 días</button>`:''}
+          ${e.estado!=='empresa_rechazada'?`<button class="mini no" onclick="rechazarEmpresa('${e.id}')">Rechazar</button>`:''}
+        </div></div>`;
+    }).join('');
+  }catch(err){ body.innerHTML='<div class="sub">Error: '+err.message+'</div>'; }
+};
+window.aprobarEmpresa=async function(empresaId){
+  const {doc,updateDoc}=window._fs;
+  const vence=Date.now()+7*86400000;
+  try{
+    await updateDoc(doc(db,'empresas',empresaId),{estado:'empresa_activa',vence,activada:Date.now()});
+    // activar también al usuario admin fundador (su uid == empresaId)
+    await updateDoc(doc(db,'usuarios',empresaId),{estado:'prueba',vence,rol:'admin_empresa'});
+    toast('✓ Empresa activada · prueba 7 días');
+    renderSuperAdmin();
+  }catch(e){ toast('Error: '+(e.code||e.message)); }
+};
+window.rechazarEmpresa=async function(empresaId){
+  const {doc,updateDoc}=window._fs;
+  try{
+    await updateDoc(doc(db,'empresas',empresaId),{estado:'empresa_rechazada'});
+    await updateDoc(doc(db,'usuarios',empresaId),{estado:'rechazado'});
+    toast('Empresa rechazada');
+    renderSuperAdmin();
+  }catch(e){ toast('Error: '+(e.code||e.message)); }
+};
 
 /* ============ GESTIÓN DE PLANOGRAMAS (admin) ============ */
 let PLANO_OVERRIDE=null; // planogramas cargados desde Firestore (reemplazan a los embebidos)
